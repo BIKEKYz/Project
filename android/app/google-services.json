@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "548611691877",
+    "project_id": "condoplantadvisor",
+    "storage_bucket": "condoplantadvisor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:548611691877:android:f7bb169d9cac079e207d8c",
+        "android_client_info": {
+          "package_name": "com.company.plantify"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "548611691877-1t0hfqteph11s4ci5hrsrrid9ua1vbrr.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.company.plantify",
+            "certificate_hash": "34030d3e80b6c47168839c5cdb1ee5ede2827356"
+          }
+        },
+        {
+          "client_id": "548611691877-pde69gbg9g1u00ju0t50m86kk1gcff0l.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC24KotwT-r4dzJzucZJQqkKvrLXu3CUqs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "548611691877-pde69gbg9g1u00ju0t50m86kk1gcff0l.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

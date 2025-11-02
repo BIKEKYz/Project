@@ -1,0 +1,17 @@
+android {
+    namespace "com.company.plantify"     // ตรงกับ Manifest
+    defaultConfig {
+        applicationId "com.company.plantify"  // ตรงกับ Manifest และ Firebase
+        minSdkVersion 23
+        targetSdkVersion 34
+    }
+}
+
+
+dependencies {
+  implementation "com.android.support:multidex:1.0.3"
+}
+apply plugin: "com.google.gms.google-services"
+
+
+
