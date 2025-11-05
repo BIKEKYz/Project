@@ -1,11 +1,8 @@
-// lib/main.dart — Plantify 🪴 + Firebase Auth (Google Sign-In)
-// วางไฟล์นี้ทับของเดิมได้เลย
+// lib/main.dart — Plantify 🪴 (Polished Motion Edition)
 
 import 'dart:async';
 import 'dart:ui' as ui;
-
-import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,13 +13,83 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'firebase_options.dart';
 
+/// ปรับตรงนี้ถ้าอยากลดการเคลื่อนไหว (true = นิ่งขึ้น)
+const bool kSubtleMotion = true;
+
+/// ใช้ GoogleSignIn ตัวเดียวกันทั้งแอป
+final GoogleSignIn _google = GoogleSignIn(scopes: <String>['email']);
+
+/* ───────────────────────── Google Sign-In helper ───────────────────────── */
+
+Future<UserCredential> signInWithGoogle() async {
+  final GoogleSignInAccount? gUser = await _google.signIn();
+  if (gUser == null) {
+    throw 'cancelled'; // ผู้ใช้กดยกเลิก
+  }
+  final GoogleSignInAuthentication auth = await gUser.authentication;
+
+  final OAuthCredential cred = GoogleAuthProvider.credential(
+    idToken: auth.idToken,
+    accessToken: auth.accessToken,
+  );
+
+  final UserCredential userCred =
+      await FirebaseAuth.instance.signInWithCredential(cred);
+
+  await userCred.user?.reload();
+  return userCred;
+}
+
+/* ───────────────────────────────── Avatar ───────────────────────────────── */
+
+class Avatar extends StatelessWidget {
+  const Avatar({super.key, this.size = 48});
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    // ลองดึงจาก providerData เผื่อช่องหลักยังไม่อัปเดต
+    final fromProvider = user?.providerData.isNotEmpty == true
+        ? user!.providerData.first.photoURL
+        : null;
+
+    String? url = user?.photoURL ?? fromProvider;
+
+    // แนะนำใส่พารามิเตอร์ขนาด
+    if (url != null && !url.contains('sz=')) {
+      url = '$url?sz=200';
+    }
+
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: const Color(0xFFE8F0EC),
+      backgroundImage: (url != null) ? NetworkImage(url) : null,
+      child: (url == null)
+          ? Text(
+              // ตัวย่อชื่อเป็น fallback
+              (user?.displayName?.isNotEmpty ?? false)
+                  ? user!.displayName!
+                      .trim()
+                      .split(' ')
+                      .map((e) => e[0])
+                      .take(2)
+                      .join()
+                      .toUpperCase()
+                  : '🙂',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            )
+          : null,
+    );
+  }
+}
+
 /* ============================== App Bootstrap ============================== */
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const CondoPlantApp());
 }
 
@@ -32,9 +99,8 @@ class CondoPlantApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = GoogleFonts.notoSansThaiTextTheme(
-      ThemeData.light().textTheme,
-    );
+    final textTheme =
+        GoogleFonts.notoSansThaiTextTheme(ThemeData.light().textTheme);
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Plantify🪴',
@@ -43,6 +109,11 @@ class CondoPlantApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: seed),
         scaffoldBackgroundColor: const Color(0xFFF6F7F4),
         textTheme: textTheme,
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
       ),
       home: const AuthGate(),
     );
@@ -76,24 +147,19 @@ class _AuthGateState extends State<AuthGate> {
     setState(() => _busy = true);
     try {
       if (kIsWeb) {
+        // Web ใช้ popup provider
         final provider = GoogleAuthProvider()
+          ..addScope('email')
           ..setCustomParameters({'prompt': 'select_account'});
         await FirebaseAuth.instance.signInWithPopup(provider);
       } else {
-        final gUser = await GoogleSignIn().signIn();
-        if (gUser == null) return;
-        final gAuth = await gUser.authentication;
-        final cred = GoogleAuthProvider.credential(
-          accessToken: gAuth.accessToken,
-          idToken: gAuth.idToken,
-        );
-        await FirebaseAuth.instance.signInWithCredential(cred);
+        // Android/iOS ใช้ helper ด้านบน
+        await signInWithGoogle();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign-in failed: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Sign-in failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -106,127 +172,248 @@ class _AuthGateState extends State<AuthGate> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_user == null) {
-      return _SignInScreen(onGoogle: _signIn);
+      return LoginSignupScreen(onGoogle: _signIn);
     }
     return const SplashScreen();
   }
 }
 
-/* ========================== Beautiful Sign-in UI ========================== */
+/* ========================== Login / Signup (Tabbed) ========================== */
 
-class _SignInScreen extends StatelessWidget {
+class LoginSignupScreen extends StatefulWidget {
   final VoidCallback onGoogle;
-  const _SignInScreen({required this.onGoogle});
+  const LoginSignupScreen({super.key, required this.onGoogle});
+
+  @override
+  State<LoginSignupScreen> createState() => _LoginSignupScreenState();
+}
+
+class _LoginSignupScreenState extends State<LoginSignupScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+  final _email = TextEditingController();
+  final _pass = TextEditingController();
+  bool _remember = false;
+  bool _busy = false;
+  bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+    _restoreRemembered();
+  }
+
+  Future<void> _restoreRemembered() async {
+    final sp = await SharedPreferences.getInstance();
+    _remember = sp.getBool('remember') ?? false;
+    if (_remember) _email.text = sp.getString('remember_email') ?? '';
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _persistRemembered() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool('remember', _remember);
+    if (_remember) {
+      await sp.setString('remember_email', _email.text.trim());
+    } else {
+      await sp.remove('remember_email');
+    }
+  }
+
+  void _showMsg(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _onSubmit() async {
+    final email = _email.text.trim();
+    final pass = _pass.text;
+    if (email.isEmpty || pass.isEmpty) {
+      _showMsg('กรุณากรอกอีเมลและรหัสผ่าน');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      if (_tab.index == 0) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: pass,
+        );
+      } else {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: email,
+          password: pass,
+        );
+      }
+      await _persistRemembered();
+    } on FirebaseAuthException catch (e) {
+      _showMsg(e.message ?? 'เกิดข้อผิดพลาดในการยืนยันตัวตน');
+    } catch (e) {
+      _showMsg('เกิดข้อผิดพลาด: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      _showMsg('กรอกอีเมลก่อนเพื่อส่งลิงก์รีเซ็ตรหัสผ่าน');
+      return;
+    }
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      _showMsg('ส่งอีเมลรีเซ็ตรหัสผ่านแล้ว');
+    } on FirebaseAuthException catch (e) {
+      _showMsg(e.message ?? 'ส่งอีเมลไม่สำเร็จ');
+    }
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    _email.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
-    // ระยะห่างที่บาลานซ์กับหน้าจอ (responsive)
     final size = MediaQuery.of(context).size;
-    final horizontalPad = size.width <= 420 ? 16.0 : 20.0;
-    final verticalPad = size.height <= 720 ? 8.0 : 12.0;
-    final align = size.width >= 900
-        ? const Alignment(-0.55, 0.0) // ชิดซ้ายราว 55% บนจอใหญ่
-        : Alignment.center; // จอเล็กจัดกลาง
+    final maxCardW = size.width < 420 ? size.width - 24 : 420.0;
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
-          const _AnimatedBackdrop(),
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: horizontalPad, vertical: verticalPad),
-              child: Align(
-                alignment: align,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 520),
-                  child: _Glass(
-                    elevation: 18,
-                    radius: 28,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
-                      child: _StaggeredEnter(
-                        delays: const [0, 90, 160, 260],
+          const _LeafyBackdrop(),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _AppHeader(cs: cs),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxCardW),
+                  child: Material(
+                    color: cs.surface.withOpacity(.86),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: cs.outlineVariant.withOpacity(.25)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(.06),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          // โลโก้ในวงแหวนแสง
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                const _PulseHalo(size: 86),
-                                Container(
-                                  padding: const EdgeInsets.all(18),
-                                  decoration: BoxDecoration(
-                                    color: cs.primaryContainer,
-                                    borderRadius: BorderRadius.circular(20),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: cs.primary.withOpacity(.18),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 10),
-                                      )
-                                    ],
-                                  ),
-                                  child: Icon(Icons.eco_rounded,
-                                      size: 40, color: cs.onPrimaryContainer),
-                                ),
+                          Container(
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: TabBar(
+                              controller: _tab,
+                              indicator: BoxDecoration(
+                                color: cs.primary,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              labelColor: cs.onPrimary,
+                              unselectedLabelColor: cs.onSurfaceVariant,
+                              tabs: const [
+                                Tab(text: 'Log In'),
+                                Tab(text: 'Sign up'),
                               ],
                             ),
                           ),
-
-                          // ข้อความต้อนรับ
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 18),
-                              Text(
-                                'ยินดีต้อนรับสู่ Plantify 🪴',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.w800),
+                          const SizedBox(height: 14),
+                          TextField(
+                            controller: _email,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration:
+                                const InputDecoration(labelText: 'Email'),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _pass,
+                            obscureText: _obscure,
+                            decoration: InputDecoration(
+                              labelText: 'Password',
+                              suffixIcon: IconButton(
+                                icon: Icon(_obscure
+                                    ? Icons.visibility_off
+                                    : Icons.visibility),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'เข้าสู่ระบบด้วย Google เพื่อบันทึกรายการโปรด ซิงก์ข้อมูล และเริ่มต้นประสบการณ์สวนในคอนโดแบบมืออาชีพ',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Checkbox(
+                                value: _remember,
+                                onChanged: (v) =>
+                                    setState(() => _remember = (v ?? false)),
+                              ),
+                              const Text('Remember me'),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: _forgotPassword,
+                                child: const Text('Forgot Password ?'),
                               ),
                             ],
                           ),
-
-                          // ปุ่ม Google
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: GoogleButton(onPressed: onGoogle),
+                          const SizedBox(height: 6),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              onPressed: _busy ? null : _onSubmit,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF5BD0E6),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _busy
+                                  ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : Text(
+                                      _tab.index == 0
+                                          ? 'Log In'
+                                          : 'Create account',
+                                    ),
                             ),
                           ),
-
-                          // ข้อความกำกับ
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              'โดยดำเนินการต่อ คุณยอมรับนโยบายความเป็นส่วนตัวและเงื่อนไขการใช้งาน',
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                          ),
+                          const SizedBox(height: 12),
+                          _OrDivider(textColor: cs.onSurfaceVariant),
+                          const SizedBox(height: 12),
+                          GoogleButton(onPressed: widget.onGoogle),
                         ],
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -235,199 +422,108 @@ class _SignInScreen extends StatelessWidget {
   }
 }
 
-/// พื้นหลังกราเดียนต์ที่ค่อย ๆ เคลื่อนที่ ให้ความรู้สึก premium
-class _AnimatedBackdrop extends StatefulWidget {
-  const _AnimatedBackdrop();
-  @override
-  State<_AnimatedBackdrop> createState() => _AnimatedBackdropState();
-}
+/* -------------------------- Small helper widgets -------------------------- */
 
-class _AnimatedBackdropState extends State<_AnimatedBackdrop>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ac;
-
-  @override
-  void initState() {
-    super.initState();
-    _ac = AnimationController(vsync: this, duration: const Duration(seconds: 8))
-      ..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
+class _OrDivider extends StatelessWidget {
+  final Color? textColor;
+  const _OrDivider({this.textColor});
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return AnimatedBuilder(
-      animation: _ac,
-      builder: (_, __) {
-        final t = _ac.value;
-        final c1 = Color.lerp(const Color(0xFFEFF6F1), cs.surface, 0.10)!;
-        final c2 = Color.lerp(
-            cs.primary.withOpacity(.22), const Color(0xFFB8E2C2), t)!;
-        final c3 = Color.lerp(
-            const Color(0xFFF9FBF7), const Color(0xFFE7F2EA), 1 - t)!;
-
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment(-1 + t, -1),
-              end: Alignment(1, 1 - t),
-              colors: [c1, c2, c3],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// การ์ดใสแบบ glass (blur + translucent)
-class _Glass extends StatelessWidget {
-  final Widget child;
-  final double radius;
-  final double elevation;
-  const _Glass({required this.child, this.radius = 24, this.elevation = 12});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: cs.surface.withOpacity(.60),
-            borderRadius: BorderRadius.circular(radius),
-            border: Border.all(color: cs.outlineVariant.withOpacity(.35)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(.07),
-                blurRadius: elevation,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-/// เข้าเฟรมแบบเว้นจังหวะ (stagger) + เฟด + เลื่อนขึ้นเล็กน้อย
-class _StaggeredEnter extends StatelessWidget {
-  final List<Widget> children;
-  final List<int> delays; // ms เทียบตำแหน่ง children
-  const _StaggeredEnter({required this.children, required this.delays});
-
-  @override
-  Widget build(BuildContext context) {
-    assert(
-        children.length == delays.length, 'children & delays ต้องยาวเท่ากัน');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final c = textColor ?? Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
       children: [
-        for (var i = 0; i < children.length; i++)
-          _EnterItem(delayMs: delays[i], child: children[i]),
+        Expanded(child: Divider(color: c.withOpacity(.4))),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text('Or', style: TextStyle(color: c)),
+        ),
+        Expanded(child: Divider(color: c.withOpacity(.4))),
       ],
     );
   }
 }
 
-class _EnterItem extends StatefulWidget {
-  final int delayMs;
-  final Widget child;
-  const _EnterItem({required this.delayMs, required this.child});
-  @override
-  State<_EnterItem> createState() => _EnterItemState();
-}
-
-class _EnterItemState extends State<_EnterItem>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ac;
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
-
-  @override
-  void initState() {
-    super.initState();
-    _ac = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 480),
-    );
-    _fade = CurvedAnimation(parent: _ac, curve: Curves.easeOut);
-    _slide = Tween(begin: const Offset(0, .06), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _ac, curve: Curves.easeOutCubic));
-    Future.delayed(Duration(milliseconds: widget.delayMs), () {
-      if (mounted) _ac.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
+/// Header โลโก้วงกลม + ชื่อแอป (อยู่นอกการ์ด)
+class _AppHeader extends StatelessWidget {
+  final ColorScheme cs;
+  const _AppHeader({required this.cs});
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fade,
-      child: SlideTransition(position: _slide, child: widget.child),
-    );
-  }
-}
-
-/// วงแหวนแสงเต้นเบา ๆ รอบโลโก้
-class _PulseHalo extends StatefulWidget {
-  final double size;
-  const _PulseHalo({this.size = 80});
-  @override
-  State<_PulseHalo> createState() => _PulseHaloState();
-}
-
-class _PulseHaloState extends State<_PulseHalo>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ac;
-  @override
-  void initState() {
-    super.initState();
-    _ac = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _ac.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return AnimatedBuilder(
-      animation: _ac,
-      builder: (_, __) {
-        final t = (_ac.value - .2).clamp(0.0, 1.0);
-        final opacity = (1 - t) * .35;
-        final size = widget.size + t * 26;
-        return Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: cs.primary.withOpacity(opacity),
+    const double logoSize = 56; // ปรับได้
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CircleAvatar(
+          radius: logoSize / 2,
+          backgroundColor: cs.primaryContainer,
+          child: Icon(
+            Icons.eco_rounded,
+            color: cs.onPrimaryContainer,
+            size: logoSize * 0.6,
           ),
-        );
-      },
+        ),
+        const SizedBox(width: 10),
+        Text(
+          'Plantify',
+          style: GoogleFonts.notoSansThai(
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .2,
+            color: cs.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/* ───────────────────────────── Backdrop (ใบไม้) ───────────────────────────── */
+
+class _LeafyBackdrop extends StatelessWidget {
+  const _LeafyBackdrop();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/hero/leaves.jpg', // มี fallback กัน error หากไม่มีไฟล์
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            return Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFDDEFE3), Color(0xFFBFD8C8)],
+                ),
+              ),
+            );
+          },
+        ),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: []),
+          ),
+          foregroundDecoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.white.withOpacity(.55),
+                Colors.white.withOpacity(.35),
+                Colors.white.withOpacity(.25),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -436,7 +532,6 @@ class _PulseHaloState extends State<_PulseHalo>
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
-
   @override
   State<SplashScreen> createState() => _SplashScreenState();
 }
@@ -451,18 +546,19 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _ac = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 700),
     );
     _scale = CurvedAnimation(parent: _ac, curve: Curves.easeOutBack);
-    _ac.forward();
-    Timer(const Duration(milliseconds: 1200), () {
+    if (kSubtleMotion) _ac.forward();
+    Timer(const Duration(milliseconds: 1000), () {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 500),
+          transitionDuration: const Duration(milliseconds: 280),
           pageBuilder: (_, __, ___) => const HomeScreen(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
+          transitionsBuilder: (_, anim, __, child) => kSubtleMotion
+              ? FadeTransition(opacity: anim, child: child)
+              : child,
         ),
       );
     });
@@ -477,21 +573,19 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final logo = Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: cs.primaryContainer,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Icon(Icons.eco_rounded, size: 64, color: cs.onPrimaryContainer),
+    );
     return Scaffold(
       backgroundColor: cs.surface,
       body: Center(
-        child: ScaleTransition(
-          scale: _scale,
-          child: Container(
-            padding: const EdgeInsets.all(22),
-            decoration: BoxDecoration(
-              color: cs.primaryContainer,
-              borderRadius: BorderRadius.circular(28),
-            ),
-            child:
-                Icon(Icons.eco_rounded, size: 64, color: cs.onPrimaryContainer),
-          ),
-        ),
+        child:
+            kSubtleMotion ? ScaleTransition(scale: _scale, child: logo) : logo,
       ),
     );
   }
@@ -532,7 +626,7 @@ class Plant {
     required this.waterIntervalDays,
     required this.tags,
     required this.image,
-    required String description,
+    required String description, // รับไว้เพื่อความเข้ากันได้ (ยังไม่แสดงผล)
   });
 }
 
@@ -556,9 +650,40 @@ class PlantRepository {
               'ทนทาน แสงน้อยก็อยู่ได้ เหมาะคอนโดที่แดดเข้าไม่มาก รดน้ำน้อยและอย่าขังน้ำในกระถาง.',
           image: 'assets/images/sanseviera.jpg',
         ),
+        Plant(
+          id: 'pothos',
+          nameTh: 'พลูด่าง',
+          nameEn: 'Pothos',
+          scientific: 'Epipremnum aureum',
+          size: SizeClass.small,
+          light: Light.medium,
+          difficulty: Difficulty.easy,
+          petSafe: false,
+          airPurifying: true,
+          waterIntervalDays: 5,
+          tags: ['เลื้อย', 'ดูแลง่าย', 'ฟอกอากาศ'],
+          description:
+              'ไม้เลื้อยยอดนิยม โตไว ทน ทิ้งช่วงให้หน้าดินแห้งค่อยรด เหมาะแขวนหรือวางชั้น.',
+          image: 'assets/images/pothos.jpeg',
+        ),
+        Plant(
+          id: 'peace_lily',
+          nameTh: 'เดหลี',
+          nameEn: 'Peace Lily',
+          scientific: 'Spathiphyllum wallisii',
+          size: SizeClass.medium,
+          light: Light.low,
+          difficulty: Difficulty.medium,
+          petSafe: false,
+          airPurifying: true,
+          waterIntervalDays: 4,
+          tags: ['ออกดอก', 'ชอบชื้น', 'ฟอกอากาศ'],
+          description:
+              'ชอบความชื้นสม่ำเสมอ ไม่ต้องโดนแดดตรง ๆ ดอกสีขาวช่วยแต่งห้องให้ดูสะอาดตา.',
+          image: 'assets/images/peace_lily.jpg',
+        ),
       ];
 
-  // เพิ่มฟิลด์คำอธิบายให้ตัวอย่าง
   static const String description = '—';
 }
 
@@ -572,7 +697,6 @@ class FavoriteStore with ChangeNotifier {
   bool get isReady => _ready;
   bool isFavorite(String id) => _ids.contains(id);
   int get count => _ids.length;
-  Set<String> get all => _ids;
 
   FavoriteStore() {
     _load();
@@ -597,6 +721,45 @@ class FavoriteStore with ChangeNotifier {
     notifyListeners();
     final sp = await SharedPreferences.getInstance();
     await sp.setStringList(_key, _ids.toList());
+  }
+}
+
+/* ============================= Watering Store ============================= */
+
+class WateringStore with ChangeNotifier {
+  static const _keyPrefix = 'water_last_';
+  final Map<String, DateTime> _last = {};
+  bool _ready = false;
+
+  bool get isReady => _ready;
+
+  WateringStore() {
+    _loadAll();
+  }
+
+  DateTime lastOf(String plantId) {
+    // ถ้ายังไม่เคยรด: ถือว่าเพิ่งรดวันนี้ เพื่อ UX ที่ดีกับผู้ใช้ใหม่
+    return _last[plantId] ?? DateTime.now();
+  }
+
+  Future<void> setNow(String plantId) async {
+    _last[plantId] = DateTime.now();
+    notifyListeners();
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(
+        '$_keyPrefix$plantId', _last[plantId]!.toIso8601String());
+  }
+
+  Future<void> _loadAll() async {
+    final sp = await SharedPreferences.getInstance();
+    for (final p in PlantRepository.all()) {
+      final raw = sp.getString('$_keyPrefix${p.id}');
+      if (raw != null) {
+        _last[p.id] = DateTime.tryParse(raw) ?? DateTime.now();
+      }
+    }
+    _ready = true;
+    notifyListeners();
   }
 }
 
@@ -669,18 +832,18 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final FavoriteStore fav;
-  late final PlantFilter filter;
+  final FavoriteStore fav = FavoriteStore();
+  final PlantFilter filter = PlantFilter();
+  final WateringStore water = WateringStore();
   final all = PlantRepository.all();
   User? user;
 
   @override
   void initState() {
     super.initState();
-    fav = FavoriteStore();
-    filter = PlantFilter();
     fav.addListener(_onAny);
     filter.addListener(_onAny);
+    water.addListener(_onAny);
     user = FirebaseAuth.instance.currentUser;
     FirebaseAuth.instance.userChanges().listen((u) {
       if (!mounted) return;
@@ -692,6 +855,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     fav.removeListener(_onAny);
     filter.removeListener(_onAny);
+    water.removeListener(_onAny);
     super.dispose();
   }
 
@@ -700,7 +864,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
     if (!kIsWeb) {
-      await GoogleSignIn().signOut();
+      await _google.signOut();
     }
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -713,24 +877,44 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final filtered = filter.apply(all);
-    final showEmpty = fav.isReady && filtered.isEmpty;
+    final showEmpty = filtered.isEmpty;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(
-          'Plantify 🪴',
-          style: GoogleFonts.notoSansThai(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
-          ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        titleSpacing: 16,
+        title: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: cs.primaryContainer,
+                boxShadow: [
+                  BoxShadow(color: cs.primary.withOpacity(.25), blurRadius: 12)
+                ],
+              ),
+              child: Icon(Icons.eco_rounded, color: cs.onPrimaryContainer),
+            ),
+            const SizedBox(width: 10),
+            Text('Plantify',
+                style: GoogleFonts.notoSansThai(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .3,
+                  color: cs.primary,
+                  fontSize: 20,
+                )),
+          ],
         ),
         actions: [
           IconButton(
             tooltip: 'บัญชีของฉัน',
             onPressed: () => _openAccountSheet(context, user),
             icon: CircleAvatar(
-              radius: 14,
+              radius: 16,
               backgroundColor: cs.primaryContainer,
               backgroundImage:
                   user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
@@ -739,73 +923,140 @@ class _HomeScreenState extends State<HomeScreen> {
                   : null,
             ),
           ),
-          IconButton(
-            tooltip: 'รายการโปรด',
-            onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => FavoriteScreen(fav: fav, plants: all),
-              ));
-            },
-            icon: Stack(
-              children: [
-                const Icon(Icons.favorite_outline_rounded),
-                if (fav.count > 0)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: BoxDecoration(
-                        color: cs.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      constraints:
-                          const BoxConstraints(minWidth: 16, minHeight: 16),
-                      child: Center(
-                        child: Text(
-                          '${fav.count}',
-                          style: TextStyle(
-                            color: cs.onPrimary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFFEFF7F0),
+                    const Color(0xFFF6FBF7),
+                    const Color(0xFFFDFEFE)
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+              top: -60,
+              right: -30,
+              child: _GlowBlob(color: cs.primary.withOpacity(.15), size: 180)),
+          Positioned(
+              top: 120,
+              left: -20,
+              child:
+                  _GlowBlob(color: cs.secondary.withOpacity(.12), size: 140)),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  _HeroHeader(
+                    userName: user?.displayName ?? 'ชาวสวนเมือง',
+                    favCount: fav.count,
+                  ),
+                  const SizedBox(height: 14),
+                  Material(
+                    color: cs.surface,
+                    elevation: 2,
+                    borderRadius: BorderRadius.circular(14),
+                    shadowColor: Colors.black.withOpacity(.05),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.search, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              onChanged: filter.setQuery,
+                              decoration: const InputDecoration(
+                                hintText:
+                                    'ค้นหา: ชื่อไทย/อังกฤษ/วิทยาศาสตร์/แท็ก',
+                                border: InputBorder.none,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          FilledButton.icon(
+                            onPressed: () => _openFilterSheet(context, filter),
+                            icon: const Icon(Icons.tune_rounded, size: 18),
+                            label: const Text('กรอง'),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-              ],
-            ),
-          ),
-          IconButton(
-            tooltip: 'ล้างตัวกรอง',
-            onPressed: filter.clear,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-        child: Column(
-          children: [
-            _SearchBar(filter: filter),
-            const SizedBox(height: 12),
-            _QuickFilters(filter: filter),
-            const SizedBox(height: 12),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 250),
-                child: showEmpty
-                    ? _EmptyState(onClear: filter.clear)
-                    : _PlantGrid(plants: filtered, fav: fav),
+                  const SizedBox(height: 10),
+                  _QuickFilters(filter: filter),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: showEmpty
+                        ? _EmptyState(onClear: filter.clear)
+                        : GridView.builder(
+                            padding: const EdgeInsets.only(bottom: 16, top: 4),
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 14,
+                              mainAxisSpacing: 14,
+                              childAspectRatio: .9,
+                            ),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, i) {
+                              const double start = 0.92;
+                              return TweenAnimationBuilder<double>(
+                                tween: Tween(begin: start, end: 1.0),
+                                duration: const Duration(milliseconds: 340),
+                                curve: Curves.easeOutCubic,
+                                builder: (c, scale, child) {
+                                  final opacity =
+                                      ((scale - start) / (1.0 - start))
+                                          .clamp(0.0, 1.0);
+                                  return Transform.scale(
+                                    scale: scale,
+                                    child:
+                                        Opacity(opacity: opacity, child: child),
+                                  );
+                                },
+                                child: _TactileCard(
+                                  child: _PlantCard(
+                                    plant: filtered[i],
+                                    fav: fav,
+                                    water: water,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _signOut,
-        icon: const Icon(Icons.logout_rounded),
-        label: const Text('Sign out'),
+          ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: FilledButton.icon(
+                  onPressed: _signOut,
+                  icon: const Icon(Icons.logout_rounded),
+                  label: const Text('Sign out'),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -836,10 +1087,10 @@ class _HomeScreenState extends State<HomeScreen> {
               subtitle: Text(user?.email ?? '-'),
             ),
             const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.cloud_done_rounded),
-              title: const Text('ซิงก์รายการโปรด & การตั้งค่า'),
-              subtitle: const Text('พร้อมใช้งานเมื่อเชื่อมต่อบัญชี'),
+            const ListTile(
+              leading: Icon(Icons.cloud_done_rounded),
+              title: Text('ซิงก์รายการโปรด & การตั้งค่า'),
+              subtitle: Text('พร้อมใช้งานเมื่อเชื่อมต่อบัญชี'),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -849,7 +1100,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: const Icon(Icons.close_rounded),
                 label: const Text('ปิด'),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -885,7 +1136,8 @@ class _SearchBar extends StatelessWidget {
               backgroundColor: cs.primaryContainer,
               foregroundColor: cs.onPrimaryContainer,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(14),
+              ),
             ),
             onPressed: () => _openFilterSheet(context, filter),
             icon: const Icon(Icons.tune_rounded),
@@ -893,19 +1145,6 @@ class _SearchBar extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-
-  void _openFilterSheet(BuildContext context, PlantFilter filter) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => _FilterSheet(filter: filter),
     );
   }
 }
@@ -931,7 +1170,7 @@ class _QuickFilters extends StatelessWidget {
           children: [
             if (icon != null) ...[
               Icon(icon, size: 18),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
             ],
             Text(label),
           ],
@@ -1036,7 +1275,9 @@ class _DiffPill extends StatelessWidget {
 class _PlantGrid extends StatelessWidget {
   final List<Plant> plants;
   final FavoriteStore fav;
-  const _PlantGrid({required this.plants, required this.fav});
+  final WateringStore water;
+  const _PlantGrid(
+      {required this.plants, required this.fav, required this.water});
 
   @override
   Widget build(BuildContext context) {
@@ -1056,87 +1297,289 @@ class _PlantGrid extends StatelessWidget {
         childAspectRatio: .88,
       ),
       itemCount: plants.length,
-      itemBuilder: (context, i) => _PlantCard(plant: plants[i], fav: fav),
+      itemBuilder: (context, i) => _TactileCard(
+        child: _PlantCard(plant: plants[i], fav: fav, water: water),
+      ),
     );
   }
 }
 
+/// การ์ดสัมผัส: ยก elevation นิดๆ และ scale 0.98 ตอนกด
+class _TactileCard extends StatefulWidget {
+  final Widget child;
+  const _TactileCard({required this.child});
+  @override
+  State<_TactileCard> createState() => _TactileCardState();
+}
+
+class _TactileCardState extends State<_TactileCard> {
+  bool _down = false;
+  @override
+  Widget build(BuildContext context) {
+    final scale = (_down && kSubtleMotion) ? 0.98 : 1.0;
+    return Listener(
+      onPointerDown: (_) => setState(() => _down = true),
+      onPointerUp: (_) => setState(() => _down = false),
+      onPointerCancel: (_) => setState(() => _down = false),
+      child: AnimatedScale(
+        scale: scale,
+        duration: const Duration(milliseconds: 90),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          decoration: BoxDecoration(
+            boxShadow: [
+              if (_down && kSubtleMotion)
+                BoxShadow(
+                  color: Colors.black.withOpacity(.05),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+            ],
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
+
+/* ====================== Staggered appear animation helper ===================== */
+
+class DelayedScaleIn extends StatefulWidget {
+  const DelayedScaleIn({
+    super.key,
+    required this.child,
+    this.delay = const Duration(milliseconds: 250),
+    this.duration = const Duration(milliseconds: 350),
+  });
+
+  final Widget child;
+  final Duration delay;
+  final Duration duration;
+
+  @override
+  State<DelayedScaleIn> createState() => _DelayedScaleInState();
+}
+
+class _DelayedScaleInState extends State<DelayedScaleIn> {
+  bool _start = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kSubtleMotion) {
+      Future.delayed(widget.delay, () {
+        if (mounted) setState(() => _start = true);
+      });
+    } else {
+      _start = true;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      duration: widget.duration,
+      curve: Curves.easeOutCubic,
+      tween: Tween(begin: 0.92, end: _start ? 1.0 : 0.92),
+      builder: (c, scale, child) => Transform.scale(
+        scale: scale,
+        child: Opacity(opacity: (scale - .9).clamp(0, 1), child: child),
+      ),
+      child: widget.child,
+    );
+  }
+}
+
+/* ================================ Cards ================================ */
+
 class _PlantCard extends StatelessWidget {
   final Plant plant;
   final FavoriteStore fav;
-  const _PlantCard({required this.plant, required this.fav});
+  final WateringStore water;
+  const _PlantCard(
+      {required this.plant, required this.fav, required this.water});
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isFav = fav.isFavorite(plant.id);
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: () {
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => PlantDetailScreen(plant: plant, fav: fav),
-        ));
-      },
-      child: Card(
-        child: Padding(
+    // --- Watering state
+    final last = water.lastOf(plant.id);
+    final dLeft = daysUntilNextWater(last, plant.waterIntervalDays);
+    final pct = waterProgress(last, plant.waterIntervalDays);
+    final dueDate = DateTime(last.year, last.month, last.day)
+        .add(Duration(days: plant.waterIntervalDays));
+
+    final chipColor = dLeft >= 2
+        ? cs.surfaceContainerHighest
+        : dLeft >= 0
+            ? cs.secondaryContainer
+            : Colors.red.withOpacity(.12);
+
+    return Card(
+      elevation: 0,
+      color: cs.surface.withOpacity(.72),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () {
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 280),
+              pageBuilder: (_, __, ___) =>
+                  PlantDetailScreen(plant: plant, fav: fav, water: water),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+            ),
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: cs.outlineVariant.withOpacity(.22)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(.04),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
           padding: const EdgeInsets.all(14),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(22),
-                child: Image.asset(
-                  plant.image,
-                  height: 84,
-                  width: 84,
-                  fit: BoxFit.cover,
-                ),
+              Row(
+                children: [
+                  // ==== รูป + Hero ====
+                  Hero(
+                    tag: 'plant:${plant.id}',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: Image.asset(
+                        plant.image,
+                        height: 84,
+                        width: 84,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            _AvatarLetter(id: plant.id),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(plant.nameTh,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
+                        Text(plant.nameEn,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: isFav ? 'นำออกจากโปรด' : 'เพิ่มรายการโปรด',
+                    style: IconButton.styleFrom(
+                      backgroundColor: isFav
+                          ? cs.primaryContainer
+                          : cs.surfaceContainerHighest,
+                      shape: const CircleBorder(),
+                    ),
+                    onPressed: () => fav.toggle(plant.id),
+                    icon: Icon(
+                        isFav
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        color: isFav ? cs.primary : cs.onSurface),
+                  )
+                ],
               ),
               const SizedBox(height: 10),
-              Text(
-                plant.nameTh,
-                style: Theme.of(context).textTheme.titleMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              Text(
-                plant.nameEn,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const Spacer(),
               Wrap(
                 spacing: 6,
                 runSpacing: -8,
                 children: [
-                  _Pill(
+                  _Tag(
                       icon: Icons.wb_sunny_outlined,
                       text: _lightText(plant.light)),
-                  _Pill(
+                  _Tag(
                       icon: Icons.water_drop_outlined,
                       text: 'ทุก ${plant.waterIntervalDays} วัน'),
-                  if (plant.petSafe)
-                    const _Pill(icon: Icons.pets_rounded, text: 'Pet-safe'),
                   if (plant.airPurifying)
-                    const _Pill(icon: Icons.air_rounded, text: 'ฟอกอากาศ'),
+                    const _Tag(icon: Icons.air_rounded, text: 'ฟอกอากาศ'),
                 ],
               ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton.filledTonal(
-                  tooltip: fav.isFavorite(plant.id)
-                      ? 'นำออกจากโปรด'
-                      : 'เพิ่มรายการโปรด',
-                  onPressed: () => fav.toggle(plant.id),
-                  icon: Icon(
-                    fav.isFavorite(plant.id)
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
+              const Spacer(),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text('รดน้ำครั้งถัดไป',
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: cs.onSurfaceVariant)),
+                      const Spacer(),
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: chipColor,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${describeWaterDueTH(dLeft)} • ${_fmtDateTH(dueDate)}',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: pct,
+                    minHeight: 6,
+                    borderRadius: BorderRadius.circular(8),
+                    backgroundColor: cs.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation(
+                      Color.lerp(cs.secondary, Colors.redAccent, pct * .8)!,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        await water.setNow(plant.id);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('บันทึกว่า “รดน้ำแล้ว”')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.water_drop_rounded),
+                      label: const Text('รดน้ำแล้ว'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -1150,6 +1593,29 @@ class _PlantCard extends StatelessWidget {
       : l == Light.medium
           ? 'แสงรำไร'
           : 'แสงสว่างจัด';
+}
+
+class _Tag extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _Tag({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Chip(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      backgroundColor: cs.surfaceContainerHighest,
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16),
+          const SizedBox(width: 6),
+          Text(text),
+        ],
+      ),
+    );
+  }
 }
 
 class _Pill extends StatelessWidget {
@@ -1178,7 +1644,6 @@ class _Pill extends StatelessWidget {
 class _AvatarLetter extends StatelessWidget {
   final String id;
   const _AvatarLetter({required this.id});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1197,10 +1662,10 @@ class _AvatarLetter extends StatelessWidget {
       child: Center(
         child: Text(
           letter,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: cs.onPrimaryContainer,
-                fontSize: 36,
-              ),
+          style: Theme.of(context)
+              .textTheme
+              .titleLarge
+              ?.copyWith(color: cs.onPrimaryContainer, fontSize: 36),
         ),
       ),
     );
@@ -1210,7 +1675,6 @@ class _AvatarLetter extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   final VoidCallback onClear;
   const _EmptyState({required this.onClear});
-
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -1223,13 +1687,15 @@ class _EmptyState extends StatelessWidget {
           Text('ไม่พบผลลัพธ์ที่ตรงเงื่อนไข',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
-          Text('ลองเปลี่ยนตัวกรองหรือเคลียร์ทั้งหมด',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: cs.outline)),
+          Text(
+            'ลองเปลี่ยนตัวกรองหรือเคลียร์ทั้งหมด',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: cs.outline),
+          ),
           const SizedBox(height: 12),
-          OutlinedButton(onPressed: onClear, child: const Text('ล้างตัวกรอง'))
+          OutlinedButton(onPressed: onClear, child: const Text('ล้างตัวกรอง')),
         ],
       ),
     );
@@ -1246,23 +1712,23 @@ class _FilterSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    Widget section(String title, Widget child) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title,
+    Widget section(String title, Widget child) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
-                    ?.copyWith(color: cs.onSurface)),
-            const SizedBox(height: 8),
-            child,
-          ],
-        ),
-      );
-    }
+                    ?.copyWith(color: cs.onSurface),
+              ),
+              const SizedBox(height: 8),
+              child,
+            ],
+          ),
+        );
 
     ChoiceChip cchip(String label, bool sel, VoidCallback onTap) => ChoiceChip(
           label: Text(label),
@@ -1358,7 +1824,9 @@ class _FilterSheet extends StatelessWidget {
 class PlantDetailScreen extends StatelessWidget {
   final Plant plant;
   final FavoriteStore fav;
-  const PlantDetailScreen({super.key, required this.plant, required this.fav});
+  final WateringStore water;
+  const PlantDetailScreen(
+      {super.key, required this.plant, required this.fav, required this.water});
 
   @override
   Widget build(BuildContext context) {
@@ -1379,11 +1847,13 @@ class PlantDetailScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: Theme.of(context)
-                          .textTheme
-                          .labelMedium
-                          ?.copyWith(color: cs.onSurfaceVariant)),
+                  Text(
+                    title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelMedium
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                   const SizedBox(height: 2),
                   Text(value, style: Theme.of(context).textTheme.titleMedium),
                 ],
@@ -1393,6 +1863,9 @@ class PlantDetailScreen extends StatelessWidget {
         ),
       );
     }
+
+    final last = water.lastOf(plant.id);
+    final left = daysUntilNextWater(last, plant.waterIntervalDays);
 
     return Scaffold(
       appBar: AppBar(
@@ -1416,8 +1889,18 @@ class PlantDetailScreen extends StatelessWidget {
           Row(
             children: [
               Hero(
-                  tag: 'avatar_${plant.id}',
-                  child: _AvatarLetter(id: plant.id)),
+                tag: 'plant:${plant.id}',
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.asset(
+                    plant.image,
+                    height: 84,
+                    width: 84,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _AvatarLetter(id: plant.id),
+                  ),
+                ),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -1426,11 +1909,13 @@ class PlantDetailScreen extends StatelessWidget {
                     Text(plant.nameEn,
                         style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 6),
-                    Text(plant.scientific,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(
+                      plant.scientific,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
                     const SizedBox(height: 10),
                     Wrap(
                       spacing: 6,
@@ -1448,14 +1933,11 @@ class PlantDetailScreen extends StatelessWidget {
                         _Pill(
                             icon: Icons.speed_rounded,
                             text: _diffText(plant.difficulty)),
-                        if (plant.petSafe)
-                          const _Pill(
-                              icon: Icons.pets_rounded, text: 'Pet-safe'),
                         if (plant.airPurifying)
                           const _Pill(
                               icon: Icons.air_rounded, text: 'ฟอกอากาศ'),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
@@ -1498,6 +1980,44 @@ class PlantDetailScreen extends StatelessWidget {
             onPressed: () => _showWateringTip(context, plant),
             icon: const Icon(Icons.tips_and_updates_rounded),
             label: const Text('ทริคการรดน้ำแบบคอนโด'),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await water.setNow(plant.id);
+                    if (context.mounted) {
+                      final left2 = daysUntilNextWater(
+                        water.lastOf(plant.id),
+                        plant.waterIntervalDays,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text(
+                                'บันทึกแล้ว • ${describeWaterDueTH(left2)}')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.water_drop_rounded),
+                  label: const Text('รดน้ำแล้ว'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  describeWaterDueTH(left),
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1557,26 +2077,7 @@ class PlantDetailScreen extends StatelessWidget {
   }
 }
 
-/* =============================== Favorites =============================== */
-
-class FavoriteScreen extends StatelessWidget {
-  final FavoriteStore fav;
-  final List<Plant> plants;
-  const FavoriteScreen({super.key, required this.fav, required this.plants});
-
-  @override
-  Widget build(BuildContext context) {
-    final list = plants.where((p) => fav.isFavorite(p.id)).toList();
-    return Scaffold(
-      appBar: AppBar(title: const Text('รายการโปรด')),
-      body: list.isEmpty
-          ? const Center(child: Text('ยังไม่มีรายการโปรด'))
-          : _PlantGrid(plants: list, fav: fav),
-    );
-  }
-}
-
-/* ============================= Google Button ============================= */
+/* ============================= Google Button (Bouncy) ============================= */
 
 class GoogleButton extends StatelessWidget {
   final VoidCallback onPressed;
@@ -1584,7 +2085,7 @@ class GoogleButton extends StatelessWidget {
   const GoogleButton({
     super.key,
     required this.onPressed,
-    this.label = 'Sign in with Google',
+    this.label = 'ลงชื่อเข้าใช้ด้วย Google',
   });
 
   @override
@@ -1611,7 +2112,25 @@ class GoogleButton extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _GoogleGlyph(),
+                Image.asset(
+                  'assets/icons/google_g.png',
+                  width: 18,
+                  height: 18,
+                  errorBuilder: (c, e, s) => Container(
+                    width: 18,
+                    height: 18,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: lightBorder),
+                    ),
+                    child: const Text(
+                      'G',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                    ),
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Text(
                   label,
@@ -1629,26 +2148,166 @@ class GoogleButton extends StatelessWidget {
   }
 }
 
-class _GoogleGlyph extends StatelessWidget {
+/* ========================== Hero / Glow helper ========================== */
+
+class _HeroHeader extends StatelessWidget {
+  final String userName;
+  final int favCount;
+  const _HeroHeader({required this.userName, required this.favCount});
+
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/icons/google_g.png',
-      width: 18,
-      height: 18,
-      errorBuilder: (c, e, s) => Container(
-        width: 18,
-        height: 18,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFFDADCE0)),
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            cs.primaryContainer.withOpacity(.9),
+            cs.secondaryContainer.withOpacity(.9)
+          ],
         ),
-        child: const Text(
-          'G',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(.06),
+              blurRadius: 20,
+              offset: const Offset(0, 8))
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 24,
+            backgroundColor: cs.onPrimaryContainer.withOpacity(.08),
+            child: const Icon(Icons.eco_rounded, size: 28),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('สวัสดี, $userName 👋',
+                    style: GoogleFonts.notoSansThai(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: cs.onPrimaryContainer)),
+                const SizedBox(height: 4),
+                Text(
+                    'เลือกต้นไม้ให้เข้ากับไลฟ์สไตล์ของคุณ แล้วดูแลได้ง่ายขึ้นวันนี้',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: cs.onPrimaryContainer.withOpacity(.85))),
+              ],
+            ),
+          ),
+          _MetricChip(
+              icon: Icons.favorite_rounded,
+              label: 'รายการโปรด',
+              value: favCount.toString()),
+        ],
       ),
     );
   }
+}
+
+class _MetricChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _MetricChip(
+      {required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cs.surface.withOpacity(.85),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withOpacity(.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: cs.primary),
+          const SizedBox(width: 6),
+          Text('$label ', style: Theme.of(context).textTheme.labelSmall),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlowBlob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _GlowBlob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+              color: color, blurRadius: size * .7, spreadRadius: size * .2)
+        ],
+      ),
+    );
+  }
+}
+
+/* ============================ Shared helpers ============================ */
+
+/// คืนค่าจำนวนวันถึงกำหนดรดน้ำครั้งถัดไป (ติดลบ = เลยกำหนด)
+int daysUntilNextWater(DateTime lastWateredAt, int intervalDays) {
+  final today = DateTime.now();
+  final today0 = DateTime(today.year, today.month, today.day);
+  final last0 =
+      DateTime(lastWateredAt.year, lastWateredAt.month, lastWateredAt.day);
+  final due = last0.add(Duration(days: intervalDays));
+  return due.difference(today0).inDays;
+}
+
+/// แปลงจำนวนวันเป็นข้อความภาษาไทยอ่านง่าย
+String describeWaterDueTH(int days) {
+  if (days > 1) return 'อีก $days วัน';
+  if (days == 1) return 'พรุ่งนี้';
+  if (days == 0) return 'วันนี้';
+  if (days == -1) return 'เลยกำหนด 1 วัน';
+  return 'เลยกำหนด ${-days} วัน';
+}
+
+/// progress 0..1 จากวันที่รดครั้งก่อน ถึงวันนี้ เทียบกับช่วงรอบ
+double waterProgress(DateTime lastWateredAt, int intervalDays) {
+  final today = DateTime.now();
+  final last0 =
+      DateTime(lastWateredAt.year, lastWateredAt.month, lastWateredAt.day);
+  final passed = today.difference(last0).inDays.clamp(0, intervalDays);
+  return (passed / intervalDays).clamp(0, 1).toDouble();
+}
+
+/// วันที่ไทยสั้น ๆ dd/MM
+String _fmtDateTH(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+
+/// ฟังก์ชันส่วนกลาง: เปิดแผ่นกรอง
+void _openFilterSheet(BuildContext context, PlantFilter filter) {
+  showModalBottomSheet(
+    context: context,
+    useSafeArea: true,
+    showDragHandle: true,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) => _FilterSheet(filter: filter),
+  );
 }
