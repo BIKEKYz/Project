@@ -599,6 +599,37 @@ enum SizeClass { tiny, small, medium }
 
 enum Difficulty { easy, medium, hard }
 
+enum Aspect { north, east, south, west }
+
+/// แม็ปทิศหน้าต่าง → ระดับแสงที่ "เหมาะสม"
+Set<Light> lightsForAspect(Aspect a) {
+  switch (a) {
+    case Aspect.north:
+      return {Light.low, Light.medium}; // ทิศเหนือ แดดน้อย
+    case Aspect.east:
+      return {Light.medium, Light.bright}; // เช้า แดดอ่อน-รำไรถึงสว่าง
+    case Aspect.south:
+      return {Light.bright, Light.medium}; // ใต้ แดดจัด
+    case Aspect.west:
+      return {Light.bright, Light.medium}; // บ่าย แดดแรง
+  }
+}
+
+/// ชื่อไทยของทิศ (ไว้ใช้บน UI)
+String aspectTH(Aspect? a) {
+  if (a == null) return 'ทั้งหมด';
+  switch (a) {
+    case Aspect.north:
+      return 'ทิศเหนือ';
+    case Aspect.east:
+      return 'ทิศตะวันออก';
+    case Aspect.south:
+      return 'ทิศใต้';
+    case Aspect.west:
+      return 'ทิศตะวันตก';
+  }
+}
+
 class Plant {
   final String id;
   final String nameTh;
@@ -680,7 +711,7 @@ class PlantRepository {
           tags: ['ออกดอก', 'ชอบชื้น', 'ฟอกอากาศ'],
           description:
               'ชอบความชื้นสม่ำเสมอ ไม่ต้องโดนแดดตรง ๆ ดอกสีขาวช่วยแต่งห้องให้ดูสะอาดตา.',
-          image: 'assets/images/peace_lily.jpg',
+          image: "assets/images/zz.jpeg",
         ),
       ];
 
@@ -772,12 +803,16 @@ class PlantFilter with ChangeNotifier {
   bool onlyAirPurifying = false;
   Difficulty? difficulty;
 
+  // ตัวกรองทิศหน้าต่าง/แดด
+  Aspect? aspect;
+
   void clear() {
     query = '';
     light = null;
     difficulty = null;
     onlyPetSafe = false;
     onlyAirPurifying = false;
+    aspect = null; // เคลียร์ทิศด้วย
     notifyListeners();
   }
 
@@ -806,19 +841,32 @@ class PlantFilter with ChangeNotifier {
     notifyListeners();
   }
 
+  // ตั้งค่าทิศ
+  void setAspect(Aspect? a) {
+    aspect = a;
+    notifyListeners();
+  }
+
   List<Plant> apply(List<Plant> src) {
     return src.where((p) {
       final q = query.toLowerCase();
+
       final okQ = q.isEmpty ||
           p.nameTh.toLowerCase().contains(q) ||
           p.nameEn.toLowerCase().contains(q) ||
           p.scientific.toLowerCase().contains(q) ||
           p.tags.any((t) => t.toLowerCase().contains(q));
+
       final okLight = light == null || p.light == light;
       final okDiff = difficulty == null || p.difficulty == difficulty;
       final okPet = !onlyPetSafe || p.petSafe;
       final okAir = !onlyAirPurifying || p.airPurifying;
-      return okQ && okLight && okDiff && okPet && okAir;
+
+      // ถ้าเลือกทิศ → เช็กว่าระดับแสงของต้นไม้อยู่ในช่วงที่เหมาะกับทิศนั้น
+      final okAspect =
+          aspect == null || lightsForAspect(aspect!).contains(p.light);
+
+      return okQ && okLight && okDiff && okPet && okAir && okAspect;
     }).toList();
   }
 }
@@ -961,7 +1009,25 @@ class _HomeScreenState extends State<HomeScreen> {
                     userName: user?.displayName ?? 'ชาวสวนเมือง',
                     favCount: fav.count,
                   ),
+
+                  const SizedBox(height: 12),
+
+                  // 👉 แถบเรียกแบบสอบถามไลฟ์สไตล์
+                  _LifestyleQuizCallout(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RecommendationScreen(
+                            allPlants: all,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
                   const SizedBox(height: 14),
+
+                  // กล่อง search เดิม
                   Material(
                     color: cs.surface,
                     elevation: 2,
@@ -1022,8 +1088,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                           .clamp(0.0, 1.0);
                                   return Transform.scale(
                                     scale: scale,
-                                    child:
-                                        Opacity(opacity: opacity, child: child),
+                                    child: Opacity(
+                                      opacity: opacity,
+                                      child: child,
+                                    ),
                                   );
                                 },
                                 child: _TactileCard(
@@ -1102,6 +1170,73 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LifestyleQuizCallout extends StatelessWidget {
+  final VoidCallback onTap;
+  const _LifestyleQuizCallout({Key? key, required this.onTap})
+      : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: cs.surface,
+      borderRadius: BorderRadius.circular(16),
+      elevation: 2,
+      shadowColor: Colors.black.withOpacity(.05),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.quiz_rounded,
+                  color: cs.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'แบบสอบถามแนะนำต้นไม้',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'กรอกไลฟ์สไตล์สั้น ๆ แล้วให้ระบบช่วยเลือกต้นไม้ที่เหมาะกับคุณ',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: cs.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1200,10 +1335,47 @@ class _QuickFilters extends StatelessWidget {
             onTap: filter.toggleAirPurifying,
           ),
           const SizedBox(width: 8),
+
+          // 👉 ปุ่มเลือกทิศที่เพิ่มมา
+          _AspectPill(filter: filter),
+
+          const SizedBox(width: 8),
           _LightPill(filter: filter),
           const SizedBox(width: 8),
           _DiffPill(filter: filter),
         ],
+      ),
+    );
+  }
+}
+
+class _AspectPill extends StatelessWidget {
+  final PlantFilter filter;
+  const _AspectPill({required this.filter});
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<Aspect?>(
+      tooltip: 'กรองตามทิศหน้าต่าง/แดดเข้าห้อง',
+      onSelected: filter.setAspect,
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: null, child: Text('ทั้งหมด')),
+        PopupMenuItem(value: Aspect.north, child: Text('ทิศเหนือ')),
+        PopupMenuItem(value: Aspect.east, child: Text('ทิศตะวันออก')),
+        PopupMenuItem(value: Aspect.south, child: Text('ทิศใต้')),
+        PopupMenuItem(value: Aspect.west, child: Text('ทิศตะวันตก')),
+      ],
+      child: const Chip(
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.explore_outlined, size: 18),
+            SizedBox(width: 6),
+            Text('ทิศ'),
+            SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -1741,6 +1913,7 @@ class _FilterSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // ───────── แสง ─────────
           section(
             'แสง',
             Wrap(
@@ -1757,6 +1930,28 @@ class _FilterSheet extends StatelessWidget {
               ],
             ),
           ),
+
+          // ───────── ทิศหน้าต่าง/แดด ─────────
+          section(
+            'ทิศหน้าต่าง/แดดเข้าห้อง',
+            Wrap(
+              spacing: 8,
+              children: [
+                cchip('ทั้งหมด', filter.aspect == null,
+                    () => filter.setAspect(null)),
+                cchip('ทิศเหนือ', filter.aspect == Aspect.north,
+                    () => filter.setAspect(Aspect.north)),
+                cchip('ทิศตะวันออก', filter.aspect == Aspect.east,
+                    () => filter.setAspect(Aspect.east)),
+                cchip('ทิศใต้', filter.aspect == Aspect.south,
+                    () => filter.setAspect(Aspect.south)),
+                cchip('ทิศตะวันตก', filter.aspect == Aspect.west,
+                    () => filter.setAspect(Aspect.west)),
+              ],
+            ),
+          ),
+
+          // ───────── ระดับดูแล ─────────
           section(
             'ระดับดูแล',
             Wrap(
@@ -1773,6 +1968,8 @@ class _FilterSheet extends StatelessWidget {
               ],
             ),
           ),
+
+          // ───────── คุณสมบัติ ─────────
           section(
             'คุณสมบัติ',
             Wrap(
@@ -2259,6 +2456,378 @@ class _GlowBlob extends StatelessWidget {
           BoxShadow(
               color: color, blurRadius: size * .7, spreadRadius: size * .2)
         ],
+      ),
+    );
+  }
+}
+
+@override
+Widget build(BuildContext context) {
+  final cs = Theme.of(context).colorScheme;
+  GestureTapCallback? onTap;
+  return Material(
+    color: cs.surface,
+    borderRadius: BorderRadius.circular(16),
+    elevation: 2,
+    shadowColor: Colors.black.withOpacity(.05),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: cs.primaryContainer,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.quiz_rounded,
+                color: cs.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'แบบสอบถามแนะนำต้นไม้',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'กรอกไลฟ์สไตล์สั้น ๆ แล้วให้ระบบช่วยเลือกต้นไม้ที่เหมาะกับคุณ',
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: cs.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+/* ======================= Recommendation Questionnaire ======================= */
+
+class RecommendationAnswers {
+  final Aspect? aspect;
+  final bool hasPets;
+  final int careLevel; // 0 = น้อย, 1 = ปานกลาง, 2 = เยอะ
+  final bool wantAirPurify;
+  final Difficulty? experience;
+
+  const RecommendationAnswers({
+    required this.aspect,
+    required this.hasPets,
+    required this.careLevel,
+    required this.wantAirPurify,
+    required this.experience,
+  });
+}
+
+class PlantScore {
+  final Plant plant;
+  final int score;
+  const PlantScore(this.plant, this.score);
+}
+
+/// ฟังก์ชันให้คะแนนความเหมาะสมของต้นไม้แต่ละต้นตามคำตอบแบบสอบถาม
+int scorePlantForUser(Plant p, RecommendationAnswers a) {
+  int score = 50; // เริ่มกลาง ๆ
+
+  // 1) ทิศห้อง → แสง
+  if (a.aspect != null) {
+    final goodLights = lightsForAspect(a.aspect!);
+    if (goodLights.contains(p.light)) {
+      score += 20;
+    } else {
+      score -= 10;
+    }
+  }
+
+  // 2) สัตว์เลี้ยง
+  if (a.hasPets) {
+    if (p.petSafe) {
+      score += 20;
+    } else {
+      score -= 15;
+    }
+  }
+
+  // 3) ต้องการฟอกอากาศไหม
+  if (a.wantAirPurify) {
+    if (p.airPurifying) {
+      score += 15;
+    } else {
+      score -= 5;
+    }
+  }
+
+  // 4) เวลาในการดูแลต่อสัปดาห์
+  if (a.careLevel == 0) {
+    // เวลาน้อย → ชอบต้นง่าย + รดน้ำห่าง ๆ
+    if (p.difficulty == Difficulty.easy) score += 10;
+    if (p.difficulty == Difficulty.hard) score -= 10;
+    if (p.waterIntervalDays >= 7) score += 10;
+    if (p.waterIntervalDays <= 3) score -= 10;
+  } else if (a.careLevel == 2) {
+    // มีเวลาเยอะ → ยอมรับต้นยาก/รดถี่ได้
+    if (p.difficulty == Difficulty.hard) score += 10;
+    if (p.waterIntervalDays <= 4) score += 5;
+  }
+
+  // 5) ประสบการณ์ปลูกต้นไม้
+  if (a.experience != null) {
+    if (a.experience == p.difficulty) {
+      score += 10;
+    } else if (a.experience == Difficulty.easy &&
+        p.difficulty == Difficulty.hard) {
+      score -= 10;
+    }
+  }
+
+  // จำกัดให้อยู่ใน 0–100
+  if (score < 0) score = 0;
+  if (score > 100) score = 100;
+  return score;
+}
+
+class RecommendationScreen extends StatefulWidget {
+  final List<Plant> allPlants;
+  const RecommendationScreen({super.key, required this.allPlants});
+
+  @override
+  State<RecommendationScreen> createState() => _RecommendationScreenState();
+}
+
+class _RecommendationScreenState extends State<RecommendationScreen> {
+  Aspect? _aspect;
+  bool _hasPets = false;
+  int _careLevel = 1; // 0 น้อย, 1 กลาง, 2 เยอะ
+  bool _wantAir = true;
+  Difficulty? _experience = Difficulty.easy;
+
+  List<PlantScore> _results = [];
+
+  void _calculate() {
+    final answers = RecommendationAnswers(
+      aspect: _aspect,
+      hasPets: _hasPets,
+      careLevel: _careLevel,
+      wantAirPurify: _wantAir,
+      experience: _experience,
+    );
+
+    final scored = widget.allPlants
+        .map((p) => PlantScore(p, scorePlantForUser(p, answers)))
+        .where((ps) => ps.score > 0)
+        .toList();
+
+    scored.sort((a, b) => b.score.compareTo(a.score));
+
+    setState(() {
+      _results = scored;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('แบบสอบถามแนะนำต้นไม้'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ตอบคำถามสั้น ๆ เพื่อดูต้นไม้ที่เหมาะกับห้องและไลฟ์สไตล์ของคุณ',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+
+            // Q1 ทิศ
+            Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField<Aspect?>(
+                  initialValue: _aspect,
+                  decoration: const InputDecoration(
+                    labelText: 'หน้าต่างหลักหันไปทางไหน',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: null, child: Text('ไม่แน่ใจ / ทุกทิศ')),
+                    DropdownMenuItem(
+                        value: Aspect.north, child: Text('ทิศเหนือ')),
+                    DropdownMenuItem(
+                        value: Aspect.east, child: Text('ทิศตะวันออก')),
+                    DropdownMenuItem(
+                        value: Aspect.south, child: Text('ทิศใต้')),
+                    DropdownMenuItem(
+                        value: Aspect.west, child: Text('ทิศตะวันตก')),
+                  ],
+                  onChanged: (v) => setState(() => _aspect = v),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Q2 สัตว์เลี้ยง
+            Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: SwitchListTile(
+                title: const Text('มีสัตว์เลี้ยง (หมา/แมว) อยู่ในห้องนี้ไหม'),
+                subtitle: const Text(
+                    'ถ้ามี ระบบจะพยายามเลือกต้นที่ปลอดภัยต่อสัตว์เลี้ยง'),
+                value: _hasPets,
+                onChanged: (v) => setState(() => _hasPets = v),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Q3 เวลาในการดูแล
+            Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField<int>(
+                  initialValue: _careLevel,
+                  decoration: const InputDecoration(
+                    labelText: 'มีเวลาให้ต้นไม้ประมาณเท่าไหร่ต่อสัปดาห์',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: 0, child: Text('น้อย (แทบไม่มีเวลาเลย)')),
+                    DropdownMenuItem(
+                        value: 1, child: Text('ปานกลาง (พอดูแลได้)')),
+                    DropdownMenuItem(
+                        value: 2, child: Text('เยอะ (ดูแลได้สม่ำเสมอ)')),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _careLevel = v);
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Q4 ฟอกอากาศ
+            Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: SwitchListTile(
+                title: const Text('อยากได้ต้นไม้ที่ช่วยฟอกอากาศเป็นพิเศษ'),
+                value: _wantAir,
+                onChanged: (v) => setState(() => _wantAir = v),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Q5 ประสบการณ์ปลูก
+            Card(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField<Difficulty?>(
+                  initialValue: _experience,
+                  decoration: const InputDecoration(
+                    labelText: 'ประสบการณ์เลี้ยงต้นไม้ของคุณ',
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                        value: Difficulty.easy,
+                        child: Text('มือใหม่ / เคยปลูกนิดหน่อย')),
+                    DropdownMenuItem(
+                        value: Difficulty.medium,
+                        child: Text('พอมีประสบการณ์')),
+                    DropdownMenuItem(
+                        value: Difficulty.hard,
+                        child: Text('สายจริงจัง / เล่นยากได้')),
+                    DropdownMenuItem(value: null, child: Text('ไม่ระบุ')),
+                  ],
+                  onChanged: (v) => setState(() => _experience = v),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _calculate,
+                icon: const Icon(Icons.recommend_rounded),
+                label: const Text('ดูผลลัพธ์ที่เหมาะกับฉัน'),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            if (_results.isNotEmpty) ...[
+              Text(
+                'ผลลัพธ์ที่เหมาะกับคุณที่สุด',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              ..._results.take(5).map(
+                    (ps) => Card(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: cs.primaryContainer,
+                          child: Text(
+                            ps.plant.nameTh.isNotEmpty
+                                ? ps.plant.nameTh[0]
+                                : '?',
+                            style: TextStyle(color: cs.onPrimaryContainer),
+                          ),
+                        ),
+                        title: Text(ps.plant.nameTh),
+                        subtitle: Text(ps.plant.nameEn),
+                        trailing: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '${ps.score}%',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const Text('เหมาะสม'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+            ],
+          ],
+        ),
       ),
     );
   }

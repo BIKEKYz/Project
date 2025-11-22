@@ -5,17 +5,16 @@ plugins {
 }
 
 android {
-    namespace = "com.yourcompany.plantify"   // เปลี่ยนเป็นของคุณ
+    namespace = "com.company.plantify"   // เปลี่ยนเป็นของคุณ
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.yourcompany.plantify"  // ให้ตรงกับที่ต้องการ
+        applicationId = "com.company.plantify"  // ให้ตรงกับที่ต้องการ
         minSdk = 23                                  // แนะนำสำหรับ Firebase/Google Sign-In
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
     }
-}
 
     buildTypes {
         release {
