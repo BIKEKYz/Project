@@ -1,25 +1,34 @@
 plugins {
     id("com.android.application")
+    id("kotlin-android")
+    id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services")
-    // id("org.jetbrains.kotlin.android") // ถ้าโปรเจกต์คุณใช้ Kotlin
 }
 
 android {
-    namespace = "com.company.plantify"   // เปลี่ยนเป็นของคุณ
-    compileSdk = 34
+    namespace = "com.company.plantify"
+    compileSdk = flutter.compileSdkVersion
+    ndkVersion = flutter.ndkVersion
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
 
     defaultConfig {
-        applicationId = "com.company.plantify"  // ให้ตรงกับที่ต้องการ
-        minSdk = 23                                  // แนะนำสำหรับ Firebase/Google Sign-In
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        applicationId = "com.company.plantify"
+        minSdk = 23
+        targetSdk = flutter.targetSdkVersion
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
