@@ -58,11 +58,17 @@ class ProfessionalPlantCard extends StatelessWidget {
                       const BorderRadius.vertical(top: Radius.circular(20)),
                   child: Hero(
                     tag: 'plant-${plant.id}',
-                    child: Image.network(
+                    child: Image.asset(
                       plant.imageUrl,
                       height: 180,
                       width: double.infinity,
                       fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        height: 180,
+                        color: Colors.green.withOpacity(0.1),
+                        child: const Icon(Icons.local_florist,
+                            size: 60, color: Colors.green),
+                      ),
                     ),
                   ),
                 ),

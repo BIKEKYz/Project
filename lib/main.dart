@@ -1,15 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'src/theme/app_colors.dart';
-import 'src/screens/home/home_screen.dart';
-import 'src/screens/auth/login_screen.dart';
-import 'src/screens/onboarding/onboarding_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'src/screens/splash_screen.dart';
 import 'src/data/stores/favorite_store.dart';
 import 'src/data/stores/watering_store.dart';
 import 'src/data/stores/user_stats_store.dart';
@@ -22,9 +18,15 @@ import 'src/database.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Initialize Firebase for Google Sign-In
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('✅ Firebase initialized');
+  } catch (e) {
+    debugPrint('⚠️ Firebase init failed (offline mode OK): $e');
+  }
 
   try {
     final dbInit = DatabaseInitializer();
@@ -65,24 +67,7 @@ class PlantifyApp extends StatelessWidget {
             themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
             theme: _buildLightTheme(),
             darkTheme: _buildDarkTheme(),
-            home: StreamBuilder<User?>(
-              stream: FirebaseAuth.instance.authStateChanges(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Scaffold(
-                    body: Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  );
-                }
-                if (snapshot.hasData) {
-                  return const _HomeOrOnboarding();
-                }
-                return const LoginSignupScreen();
-              },
-            ),
+            home: const SplashScreen(),
           );
         },
       ),
@@ -200,29 +185,6 @@ class PlantifyApp extends StatelessWidget {
         backgroundColor: darkCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-    );
-  }
-}
-
-/// Checks SharedPreferences to route first-time users to OnboardingScreen
-class _HomeOrOnboarding extends StatelessWidget {
-  const _HomeOrOnboarding();
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: SharedPreferences.getInstance()
-          .then((p) => p.getBool('onboarding_done') ?? false),
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(
-                child: CircularProgressIndicator(color: AppColors.primary)),
-          );
-        }
-        if (snap.data == true) return const HomeScreen();
-        return const OnboardingScreen();
-      },
     );
   }
 }

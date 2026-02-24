@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/app_settings.dart';
 import '../../services/database/app_settings_database.dart';
 
@@ -15,8 +14,8 @@ class AppSettingsStore with ChangeNotifier {
   bool get darkMode => _settings?.darkMode ?? false;
 
   Future<void> loadSettings() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) return;
+    // Use a fixed local user ID for offline mode
+    const userId = 'local_user';
 
     _isLoading = true;
     notifyListeners();

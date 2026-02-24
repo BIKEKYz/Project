@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -32,12 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
   final UserProfileStore profileStore = UserProfileStore();
   final all = PlantRepository.all();
   int _tab = 0;
-  User? user;
 
   @override
   void initState() {
     super.initState();
-    user = FirebaseAuth.instance.currentUser;
     profileStore.addListener(_onAny);
   }
 
@@ -144,9 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
               title: Text(
-                s.welcomeUser(profileStore.profile?.displayName ??
-                    user?.displayName ??
-                    'Plantify'),
+                s.welcomeUser(profileStore.profile?.displayName ?? 'Plantify'),
                 style: GoogleFonts.outfit(
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,

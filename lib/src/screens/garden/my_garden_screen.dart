@@ -395,19 +395,29 @@ class _StatsDashboard extends StatelessWidget {
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _StatItem(
                   emoji: '💧',
                   value: '$needsWaterCount',
-                  label: isTh ? 'ต้องรดน้ำ' : 'Need Water',
+                  label: isTh ? 'รดน้ำ' : 'Need Water',
                   color: needsWaterCount > 0
                       ? const Color(0xFF2196F3)
                       : const Color(0xFF4CAF50),
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _StatItem(
+                  emoji: '🔥',
+                  value: '${water.currentStreak}',
+                  label: isTh ? 'วันติดกัน' : 'Streak',
+                  color: const Color(0xFFFF6D00),
+                  isDark: isDark,
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
                 child: _StatItem(
                   emoji: '🏆',

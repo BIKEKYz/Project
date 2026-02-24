@@ -26,6 +26,26 @@ class WateringStore with ChangeNotifier {
     await prefs.setInt('water_$id', DateTime.now().millisecondsSinceEpoch);
   }
 
+  /// Returns how many consecutive days (including today) at least one plant
+  /// was watered. Uses last-watered timestamps to compute.
+  int get currentStreak {
+    if (_lastWatered.isEmpty) return 0;
+
+    final wateredDays = _lastWatered.values
+        .map((dt) => DateTime(dt.year, dt.month, dt.day))
+        .toSet();
+
+    int streak = 0;
+    var day =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+    while (wateredDays.contains(day)) {
+      streak++;
+      day = day.subtract(const Duration(days: 1));
+    }
+    return streak;
+  }
+
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final keys = prefs.getKeys();

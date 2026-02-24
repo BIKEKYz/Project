@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../models/plant.dart';
@@ -453,6 +454,7 @@ class _PlantDetailScreenState extends State<PlantDetailScreen> {
                   ? () async {
                       // Only water if this is first watering today
                       if (canWater) {
+                        HapticFeedback.mediumImpact();
                         await widget.water!.setNow(widget.plant.id);
 
                         // Log to activity store

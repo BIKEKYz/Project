@@ -58,18 +58,4 @@ class UserProfile {
       customNotificationSound: json['customNotificationSound'] as String?,
     );
   }
-
-  // Firestore conversion methods
-  Map<String, dynamic> toFirestore() => toJson();
-
-  factory UserProfile.fromFirestore(
-      Map<String, dynamic> data, String documentId) {
-    return UserProfile(
-      id: documentId,
-      displayName: data['displayName'] as String?,
-      email: data['email'] as String?,
-      photoURL: data['photoURL'] as String?,
-      customPhotoURL: data['customPhotoURL'] as String?,
-    );
-  }
 }

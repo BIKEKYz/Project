@@ -1,11 +1,9 @@
 import 'dart:math';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/care_data.dart';
 import '../../models/plant.dart';
 import '../../services/notification_service.dart';
-import '../../services/database/care_logs_database.dart';
 
 class CareStore with ChangeNotifier {
   final List<CareTask> _tasks = [];
@@ -418,38 +416,15 @@ class CareStore with ChangeNotifier {
     // TODO: Save to Firestore in future update
   }
 
-  /// Save a care log to Firestore for persistence
+  /// Save a care log locally (no-op in offline mode — data lives in memory)
   Future<void> _saveCareLogToFirestore(CareLog log) async {
-    try {
-      final userId = FirebaseAuth.instance.currentUser?.uid;
-      if (userId == null) {
-        debugPrint('⚠️  User not logged in, skipping Firestore save');
-        return;
-      }
-
-      final careLogsDb = CareLogsDatabase();
-      await careLogsDb.logCare(log);
-      debugPrint(
-          '✅ Care log saved to Firestore: ${log.type} for plant ${log.plantId}');
-    } catch (e) {
-      debugPrint('❌ Error saving care log to Firestore: $e');
-      // Continue anyway - local data is still valid
-    }
+    // Offline mode: care logs are stored in-memory via _history list.
+    // No network or Firestore involved.
+    debugPrint('✅ Care log recorded: ${log.type} for plant ${log.plantId}');
   }
 
-  /// Load care history from Firestore on initialization
+  /// No-op in offline mode — history is stored in-memory.
   Future<void> loadFromFirestore(String userId) async {
-    try {
-      final careLogsDb = CareLogsDatabase();
-      final logs = await careLogsDb.getRecentCareActivities(userId, limit: 100);
-
-      _history.clear();
-      _history.addAll(logs);
-
-      notifyListeners();
-      debugPrint('✅ Loaded ${logs.length} care logs from Firestore');
-    } catch (e) {
-      debugPrint('❌ Error loading care logs from Firestore: $e');
-    }
+    debugPrint('ℹ️  Offline mode: care history is in-memory only.');
   }
 }

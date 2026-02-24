@@ -1,10 +1,9 @@
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/diary_entry.dart';
 import '../../models/plant.dart';
@@ -42,27 +41,22 @@ class _PlantDiaryScreenState extends State<PlantDiaryScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Not logged in');
-
-      // Upload to Firebase Storage
-      final File file = File(photo.path);
-      final String fileName =
-          'diary/${widget.plant.id}/${_uuid.v4()}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final Reference ref = FirebaseStorage.instance.ref().child(fileName);
-
-      await ref.putFile(file);
-      final String downloadURL = await ref.getDownloadURL();
+      // Copy photo to app documents directory for permanent local storage
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName =
+          'diary_${widget.plant.id}_${_uuid.v4()}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final destPath = '${appDir.path}/$fileName';
+      await File(photo.path).copy(destPath);
 
       // Ask for notes
       final notes = await _askForNotes();
 
-      // Create diary entry
+      // Create diary entry with local file path
       final entry = DiaryEntry(
         id: _uuid.v4(),
-        userId: user.uid,
+        userId: 'local',
         plantId: widget.plant.id,
-        photoUrl: downloadURL,
+        photoUrl: destPath, // local path instead of Firebase URL
         notes: notes,
         date: DateTime.now(),
       );
@@ -201,6 +195,9 @@ class _DiaryEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasLocalFile =
+        entry.photoUrl.isNotEmpty && File(entry.photoUrl).existsSync();
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 2,
@@ -208,19 +205,24 @@ class _DiaryEntryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Photo
+          // Photo — use FileImage for local paths
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: AspectRatio(
               aspectRatio: 1,
-              child: Image.network(
-                entry.photoUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.broken_image, size: 50),
-                ),
-              ),
+              child: hasLocalFile
+                  ? Image.file(
+                      File(entry.photoUrl),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image, size: 50),
+                      ),
+                    )
+                  : Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, size: 50),
+                    ),
             ),
           ),
           Padding(

@@ -1,11 +1,12 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/stores/user_profile_store.dart';
 import '../../data/stores/user_stats_store.dart';
 import '../../theme/app_colors.dart';
+import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   final UserProfileStore profileStore;
@@ -19,7 +20,6 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
     final profile = profileStore.profile;
 
     return Scaffold(
@@ -62,7 +62,7 @@ class ProfileScreen extends StatelessWidget {
                   const SizedBox(height: 32),
 
                   // User Info Card
-                  _buildUserInfoCard(context, user, profile),
+                  _buildUserInfoCard(context, profile),
                   const SizedBox(height: 24),
 
                   // Settings Card
@@ -81,8 +81,9 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildProfilePictureSection(BuildContext context, profile) {
-    final photoURL = profile?.profilePictureURL;
+    final photoPath = profile?.profilePictureURL; // local file path
     final isLoading = profileStore.isLoading;
+    final hasPhoto = photoPath != null && File(photoPath).existsSync();
 
     return Stack(
       children: [
@@ -102,10 +103,10 @@ class ProfileScreen extends StatelessWidget {
           child: CircleAvatar(
             radius: 70,
             backgroundColor: AppColors.primary,
-            backgroundImage: photoURL != null ? NetworkImage(photoURL) : null,
+            backgroundImage: hasPhoto ? FileImage(File(photoPath!)) : null,
             child: isLoading
                 ? const CircularProgressIndicator(color: Colors.white)
-                : (photoURL == null
+                : (!hasPhoto
                     ? const Icon(Icons.person, size: 70, color: Colors.white)
                     : null),
           ),
@@ -138,7 +139,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildUserInfoCard(BuildContext context, User? user, profile) {
+  Widget _buildUserInfoCard(BuildContext context, profile) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -160,7 +161,7 @@ class ProfileScreen extends StatelessWidget {
             children: [
               Flexible(
                 child: Text(
-                  profile?.displayName ?? user?.displayName ?? 'Plant Lover',
+                  profile?.displayName ?? 'Plant Lover',
                   style: GoogleFonts.outfit(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -184,7 +185,7 @@ class ProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            profile?.email ?? user?.email ?? '',
+            profile?.email ?? '',
             style: GoogleFonts.notoSansThai(
               fontSize: 14,
               color: AppColors.outline,
@@ -270,10 +271,8 @@ class ProfileScreen extends StatelessWidget {
                 ),
               ),
               Switch(
-                value: false, // TODO: Connect to AppSettingsStore
-                onChanged: (value) {
-                  // TODO: Toggle dark mode
-                },
+                value: false,
+                onChanged: (value) {},
                 activeColor: AppColors.primary,
               ),
             ],
@@ -372,7 +371,6 @@ class ProfileScreen extends StatelessWidget {
                           : null,
                       onTap: () {
                         Navigator.pop(context);
-                        // TODO: Save sound preference
                       },
                     ))
                 .toList(),
@@ -418,7 +416,6 @@ class ProfileScreen extends StatelessWidget {
                           : null,
                       onTap: () {
                         Navigator.pop(context);
-                        // TODO: Save language preference
                       },
                     ))
                 .toList(),
@@ -458,10 +455,13 @@ class ProfileScreen extends StatelessWidget {
           height: 50,
           child: ElevatedButton.icon(
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              await GoogleSignIn().signOut();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setBool('offline_logged_in', false);
               if (context.mounted) {
-                Navigator.of(context).popUntil((route) => route.isFirst);
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginSignupScreen()),
+                  (_) => false,
+                );
               }
             },
             icon: const Icon(Icons.logout),
@@ -603,9 +603,7 @@ class ProfileScreen extends StatelessWidget {
   }
 
   void _showEditNameDialog(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final currentName =
-        profileStore.profile?.displayName ?? user?.displayName ?? '';
+    final currentName = profileStore.profile?.displayName ?? '';
     final controller = TextEditingController(text: currentName);
 
     showDialog(

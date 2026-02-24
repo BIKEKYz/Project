@@ -1,13 +1,14 @@
+import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_strings.dart';
 import '../../data/stores/app_settings_store.dart';
 import '../../data/stores/user_profile_store.dart';
+import '../auth/login_screen.dart';
 
 // ─── Sound definitions ────────────────────────────────────────────────────────
 class _SoundOption {
@@ -32,35 +33,35 @@ const _sounds = [
     labelTh: 'เสียงเริ่มต้น',
     labelEn: 'Default',
     emoji: '🔔',
-    previewUrl: 'https://cdn.freesound.org/previews/411/411090_5121236-lq.mp3',
+    previewUrl: 'sounds/sound_default.mp3',
   ),
   _SoundOption(
     key: 'chime',
     labelTh: 'เสียงระฆัง',
     labelEn: 'Chime',
     emoji: '🎵',
-    previewUrl: 'https://cdn.freesound.org/previews/220/220173_4100837-lq.mp3',
+    previewUrl: 'sounds/sound_chime.mp3',
   ),
   _SoundOption(
     key: 'nature',
     labelTh: 'เสียงธรรมชาติ',
     labelEn: 'Nature',
     emoji: '🌿',
-    previewUrl: 'https://cdn.freesound.org/previews/346/346642_5121236-lq.mp3',
+    previewUrl: 'sounds/sound_nature.mp3',
   ),
   _SoundOption(
     key: 'water',
     labelTh: 'เสียงน้ำ',
     labelEn: 'Water Drop',
     emoji: '💧',
-    previewUrl: 'https://cdn.freesound.org/previews/398/398032_7586736-lq.mp3',
+    previewUrl: 'sounds/sound_water.mp3',
   ),
   _SoundOption(
     key: 'soft',
     labelTh: 'เสียงนุ่มนวล',
     labelEn: 'Soft Bell',
     emoji: '✨',
-    previewUrl: 'https://cdn.freesound.org/previews/411/411089_5121236-lq.mp3',
+    previewUrl: 'sounds/sound_soft.mp3',
   ),
 ];
 
@@ -88,6 +89,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String get lang => store?.language ?? 'th';
   AppStrings get s => AppStrings.of(lang);
 
+  User? get user => null;
+
   @override
   void dispose() {
     _audio.dispose();
@@ -97,7 +100,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = FirebaseAuth.instance.currentUser;
     final profile = widget.profileStore?.profile;
 
     return Scaffold(
@@ -142,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // ── Profile Card ──────────────────────────────
-                  _buildProfileCard(context, isDark, user, profile),
+                  _buildProfileCard(context, isDark, profile),
                   const SizedBox(height: 20),
 
                   // ── Appearance ────────────────────────────────
@@ -196,8 +198,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         title: lang == 'en' ? 'Sign Out' : 'ออกจากระบบ',
                         titleColor: AppColors.error,
                         onTap: () async {
-                          await FirebaseAuth.instance.signOut();
-                          await GoogleSignIn().signOut();
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setBool('offline_logged_in', false);
+                          if (context.mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                  builder: (_) => const LoginSignupScreen()),
+                              (_) => false,
+                            );
+                          }
                         },
                       ),
                     ],
@@ -227,11 +236,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   // ── Profile Card ─────────────────────────────────────────────────────────────
-  Widget _buildProfileCard(
-      BuildContext context, bool isDark, User? user, profile) {
-    final name = profile?.displayName ?? user?.displayName ?? 'Plant Lover';
-    final email = profile?.email ?? user?.email ?? '';
-    final photoURL = profile?.profilePictureURL;
+  Widget _buildProfileCard(BuildContext context, bool isDark, profile) {
+    final name = profile?.displayName ?? 'Plant Lover';
+    final email = profile?.email ?? '';
+    final photoURL = profile?.profilePictureURL; // local file path
     final isLoading = widget.profileStore?.isLoading ?? false;
 
     return GestureDetector(
@@ -261,7 +269,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   radius: 28,
                   backgroundColor: AppColors.primary.withOpacity(0.15),
                   backgroundImage:
-                      photoURL != null ? NetworkImage(photoURL) : null,
+                      (photoURL != null && File(photoURL).existsSync())
+                          ? FileImage(File(photoURL))
+                          : null,
                   child: isLoading
                       ? const SizedBox(
                           width: 20,
@@ -269,7 +279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: AppColors.primary),
                         )
-                      : photoURL == null
+                      : (photoURL == null || !File(photoURL).existsSync())
                           ? Text(
                               name.isNotEmpty ? name[0].toUpperCase() : 'P',
                               style: GoogleFonts.outfit(
@@ -396,13 +406,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       CircleAvatar(
                         radius: 44,
                         backgroundColor: AppColors.primary.withOpacity(0.12),
-                        backgroundImage: latestPhoto != null
-                            ? NetworkImage(latestPhoto)
+                        backgroundImage: (latestPhoto != null &&
+                                File(latestPhoto).existsSync())
+                            ? FileImage(File(latestPhoto))
                             : null,
                         child: isLoading
                             ? const CircularProgressIndicator(
                                 strokeWidth: 2, color: AppColors.primary)
-                            : latestPhoto == null
+                            : (latestPhoto == null ||
+                                    !File(latestPhoto).existsSync())
                                 ? Text(
                                     nameController.text.isNotEmpty
                                         ? nameController.text[0].toUpperCase()
@@ -827,7 +839,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         await _audio.stop();
                         setSheetState(() => _playingKey = sound.key);
                         setState(() => _playingKey = sound.key);
-                        await _audio.play(UrlSource(sound.previewUrl));
+                        await _audio.play(AssetSource(sound.previewUrl));
                         _audio.onPlayerComplete.listen((_) {
                           if (mounted) {
                             setSheetState(() => _playingKey = null);
@@ -933,6 +945,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         fontSize: 12,
         color: isDark ? const Color(0xFF5A7A65) : const Color(0xFF9E9E9E),
       );
+}
+
+class User {
+  get displayName => null;
+
+  get email => null;
 }
 
 // ─── Shared Widgets ───────────────────────────────────────────────────────────

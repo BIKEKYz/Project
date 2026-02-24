@@ -1,17 +1,18 @@
 import 'dart:io';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/user_profile.dart';
-import '../../services/database/user_profile_database.dart';
 
 class UserProfileStore with ChangeNotifier {
-  final UserProfileDatabase _profileDb = UserProfileDatabase();
+  static const _keyName = 'offline_user_name';
+  static const _keyEmail = 'offline_user_email';
+  static const _keyPhotoPath = 'offline_user_photo_path';
 
   UserProfile? _profile;
   UserProfile? get profile => _profile;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -20,206 +21,128 @@ class UserProfileStore with ChangeNotifier {
   }
 
   Future<void> _load() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    final name = prefs.getString(_keyName) ?? 'Plant Lover';
+    final email = prefs.getString(_keyEmail) ?? '';
+    final photoPath = prefs.getString(_keyPhotoPath);
 
-    try {
-      // Try to load from Firestore
-      _profile = await _profileDb.getProfile(user.uid);
-
-      // If profile doesn't exist in Firestore, create it
-      if (_profile == null) {
-        _profile = UserProfile(
-          id: user.uid,
-          displayName: user.displayName,
-          email: user.email,
-          photoURL: user.photoURL,
-        );
-
-        // Save to Firestore
-        await _profileDb.saveProfile(_profile!);
-      }
-    } catch (e) {
-      debugPrint('Error loading profile from Firestore: $e');
-
-      // Fallback to local cache
-      final prefs = await SharedPreferences.getInstance();
-      final profileJson = prefs.getString('user_profile');
-
-      if (profileJson != null) {
-        try {
-          _profile = UserProfile.fromJson(Map<String, dynamic>.from(
-              await Future.value(profileJson).then((json) => {
-                    'id': user.uid,
-                    'displayName': user.displayName,
-                    'email': user.email,
-                    'photoURL': user.photoURL,
-                  })));
-        } catch (_) {
-          _profile = UserProfile(
-            id: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
-          );
-        }
-      } else {
-        _profile = UserProfile(
-          id: user.uid,
-          displayName: user.displayName,
-          email: user.email,
-          photoURL: user.photoURL,
-        );
-      }
-    }
-
+    _profile = UserProfile(
+      id: 'local',
+      displayName: name,
+      email: email,
+      photoURL: null,
+      customPhotoURL: photoPath,
+    );
     notifyListeners();
   }
 
-  /// Save profile to both Firestore and local cache
   Future<void> _save() async {
     if (_profile == null) return;
-
-    try {
-      // Save to Firestore (primary storage)
-      await _profileDb.saveProfile(_profile!);
-
-      // Also save to local cache as backup
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_profile', _profile!.toJson().toString());
-    } catch (e) {
-      debugPrint('Error saving profile: $e');
-
-      // If Firestore fails, at least save locally
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('user_profile', _profile!.toJson().toString());
-      } catch (_) {}
+    final prefs = await SharedPreferences.getInstance();
+    if (_profile!.displayName != null) {
+      await prefs.setString(_keyName, _profile!.displayName!);
+    }
+    if (_profile!.email != null) {
+      await prefs.setString(_keyEmail, _profile!.email!);
+    }
+    if (_profile!.customPhotoURL != null) {
+      await prefs.setString(_keyPhotoPath, _profile!.customPhotoURL!);
+    } else {
+      await prefs.remove(_keyPhotoPath);
     }
   }
 
+  Future<void> updateDisplayName(String newName) async {
+    if (newName.trim().isEmpty) return;
+    _isLoading = true;
+    notifyListeners();
+
+    _profile = _profile?.copyWith(displayName: newName.trim()) ??
+        UserProfile(
+          id: 'local',
+          displayName: newName.trim(),
+          email: '',
+          photoURL: null,
+        );
+
+    await _save();
+    // Also update the shared prefs key used by AuthGate
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyName, newName.trim());
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> updateProfilePicture(ImageSource source) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    _isLoading = true;
+    notifyListeners();
 
     try {
-      _isLoading = true;
-      notifyListeners();
-
-      // Pick image
-      final ImagePicker picker = ImagePicker();
-      final XFile? pickedFile = await picker.pickImage(
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
         source: source,
         maxWidth: 1024,
         maxHeight: 1024,
         imageQuality: 85,
       );
 
-      if (pickedFile == null) {
+      if (picked == null) {
         _isLoading = false;
         notifyListeners();
         return;
       }
 
+      // Copy file to app documents directory (persists across sessions)
+      final appDir = await getApplicationDocumentsDirectory();
+      final fileName = 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final destPath = '${appDir.path}/$fileName';
+
       // Delete old custom photo if exists
-      if (_profile?.customPhotoURL != null) {
+      final oldPath = _profile?.customPhotoURL;
+      if (oldPath != null) {
         try {
-          await FirebaseStorage.instance
-              .refFromURL(_profile!.customPhotoURL!)
-              .delete();
-        } catch (e) {
-          // Ignore if file doesn't exist
-        }
+          final old = File(oldPath);
+          if (await old.exists()) await old.delete();
+        } catch (_) {}
       }
 
-      // Upload to Firebase Storage
-      final File file = File(pickedFile.path);
-      final String fileName =
-          'profile_pictures/${user.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final Reference ref = FirebaseStorage.instance.ref().child(fileName);
+      await File(picked.path).copy(destPath);
 
-      await ref.putFile(file);
-      final String downloadURL = await ref.getDownloadURL();
-
-      // Update profile
-      _profile = _profile?.copyWith(customPhotoURL: downloadURL) ??
+      _profile = _profile?.copyWith(customPhotoURL: destPath) ??
           UserProfile(
-            id: user.uid,
-            displayName: user.displayName,
-            email: user.email,
-            photoURL: user.photoURL,
-            customPhotoURL: downloadURL,
+            id: 'local',
+            displayName: 'Plant Lover',
+            email: '',
+            photoURL: null,
+            customPhotoURL: destPath,
           );
 
       await _save();
-      _isLoading = false;
-      notifyListeners();
     } catch (e) {
+      debugPrint('Error updating profile picture: $e');
+    } finally {
       _isLoading = false;
       notifyListeners();
-      rethrow;
     }
   }
 
   Future<void> removeProfilePicture() async {
     if (_profile?.customPhotoURL == null) return;
+    _isLoading = true;
+    notifyListeners();
 
     try {
-      _isLoading = true;
-      notifyListeners();
+      final file = File(_profile!.customPhotoURL!);
+      if (await file.exists()) await file.delete();
+    } catch (_) {}
 
-      // Delete from Firebase Storage
-      await FirebaseStorage.instance
-          .refFromURL(_profile!.customPhotoURL!)
-          .delete();
+    _profile = _profile?.copyWith(customPhotoURL: null);
+    await _save();
 
-      // Update profile
-      _profile = _profile?.copyWith(customPhotoURL: null);
-      await _save();
-
-      _isLoading = false;
-      notifyListeners();
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
+    _isLoading = false;
+    notifyListeners();
   }
 
-  /// Update display name - saves to Firestore automatically
-  Future<void> updateDisplayName(String newName) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || newName.trim().isEmpty) return;
-
-    try {
-      _isLoading = true;
-      notifyListeners();
-
-      // Update profile
-      _profile = _profile?.copyWith(displayName: newName.trim()) ??
-          UserProfile(
-            id: user.uid,
-            displayName: newName.trim(),
-            email: user.email,
-            photoURL: user.photoURL,
-          );
-
-      // Save to Firestore (data will persist forever!)
-      await _save();
-
-      _isLoading = false;
-      notifyListeners();
-
-      debugPrint('✅ Profile saved to Firestore: ${_profile!.displayName}');
-    } catch (e) {
-      debugPrint('❌ Error saving profile: $e');
-      _isLoading = false;
-      notifyListeners();
-      rethrow;
-    }
-  }
-
-  void refresh() {
-    _load();
-  }
+  void refresh() => _load();
 }

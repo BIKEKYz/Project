@@ -1,42 +1,34 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/app_settings.dart';
 
+/// Offline replacement for the old Firestore-based AppSettingsDatabase.
+/// All settings are persisted to SharedPreferences.
 class AppSettingsDatabase {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  static const String collectionName = 'app_settings';
+  static const _keySound = 'settings_watering_sound';
+  static const _keyLanguage = 'settings_language';
+  static const _keyDarkMode = 'settings_dark_mode';
 
   Future<AppSettings?> getSettings(String userId) async {
-    try {
-      final doc = await _firestore.collection(collectionName).doc(userId).get();
-
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        data['userId'] = userId; // Ensure userId is included
-        return AppSettings.fromJson(data);
-      }
-
-      return null;
-    } catch (e) {
-      throw Exception('Failed to load settings: $e');
-    }
+    final prefs = await SharedPreferences.getInstance();
+    return AppSettings(
+      userId: userId,
+      wateringSound: prefs.getString(_keySound) ?? 'default',
+      language: prefs.getString(_keyLanguage) ?? 'th',
+      darkMode: prefs.getBool(_keyDarkMode) ?? false,
+    );
   }
 
   Future<void> saveSettings(AppSettings settings) async {
-    try {
-      await _firestore
-          .collection(collectionName)
-          .doc(settings.userId)
-          .set(settings.toJson(), SetOptions(merge: true));
-    } catch (e) {
-      throw Exception('Failed to save settings: $e');
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keySound, settings.wateringSound);
+    await prefs.setString(_keyLanguage, settings.language);
+    await prefs.setBool(_keyDarkMode, settings.darkMode);
   }
 
   Future<void> deleteSettings(String userId) async {
-    try {
-      await _firestore.collection(collectionName).doc(userId).delete();
-    } catch (e) {
-      throw Exception('Failed to delete settings: $e');
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_keySound);
+    await prefs.remove(_keyLanguage);
+    await prefs.remove(_keyDarkMode);
   }
 }

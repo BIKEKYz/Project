@@ -650,11 +650,16 @@ class _StreakPlantTile extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.network(
+            child: Image.asset(
               plant.imageUrl,
               width: 50,
               height: 50,
               fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.local_florist,
+                size: 30,
+                color: Colors.green,
+              ),
             ),
           ),
           const SizedBox(width: 12),
