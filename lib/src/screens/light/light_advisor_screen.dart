@@ -292,7 +292,6 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
   // Step: 0 = room setup, 1..N = quiz, N+1 = result
   int _step = 0;
   RoomDirection _direction = RoomDirection.south;
-  Offset _windowPos = const Offset(0.5, 0.0); // relative 0..1 on room walls
   final List<int?> _answers = List.filled(_questions.length, null);
   late AnimationController _animCtrl;
   late Animation<double> _fadeAnim;
@@ -334,7 +333,6 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
         _step = 0;
         _answers.fillRange(0, _answers.length, null);
         _direction = RoomDirection.south;
-        _windowPos = const Offset(0.5, 0.0);
       });
       _animCtrl.forward();
     });
@@ -352,7 +350,6 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F9F5),
       body: SafeArea(
         child: FadeTransition(
           opacity: _fadeAnim,
@@ -374,97 +371,77 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
   Widget _buildRoomSetup() {
     final info = _DirectionInfoCard.directionData(_direction, _isTh);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Header
+          // ── Header ──────────────────────────────────────────────
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 40,
-                height: 40,
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.primary.withOpacity(0.08),
+                  shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.wb_sunny_outlined,
-                    color: AppColors.primary, size: 22),
+                child: Icon(Icons.wb_sunny_outlined,
+                    color: AppColors.primary, size: 20),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _isTh ? 'ประเมินแสงในห้อง' : 'Room Light Advisor',
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    Text(
-                      _isTh
-                          ? 'เลือกทิศและตำแหน่งหน้าต่าง'
-                          : 'Choose direction & window position',
-                      style: GoogleFonts.notoSansThai(
-                          fontSize: 13, color: Colors.black45),
-                    ),
-                  ],
+              const SizedBox(width: 10),
+              Text(
+                _isTh ? 'ประเมินแสงในห้อง' : 'Room Light Advisor',
+                style: GoogleFonts.outfit(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
-
-          // Room map
+          const SizedBox(height: 6),
           Text(
-            _isTh ? 'ตำแหน่งหน้าต่าง' : 'Window Position',
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black54,
-            ),
+            _isTh
+                ? 'หน้าต่างคุณหันไปทิศไหน?'
+                : 'Which direction does your window face?',
+            style: GoogleFonts.notoSansThai(
+                fontSize: 13, color: AppColors.textSecondary),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          _RoomLayoutWidget(
-            windowPos: _windowPos,
-            direction: _direction,
-            lang: widget.lang,
-            onWindowMoved: (pos) => setState(() => _windowPos = pos),
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
-          // Direction grid
-          Text(
-            _isTh ? 'ทิศที่หน้าต่างหันไป' : 'Window Facing Direction',
-            style: GoogleFonts.outfit(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.black54,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _CompassPicker(
+          // ── Visual Compass Wheel ─────────────────────────────────
+          _VisualCompassWheel(
             selected: _direction,
-            lang: widget.lang,
             onSelected: (d) => setState(() => _direction = d),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          // Direction summary pill
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // ── Direction Info Card ──────────────────────────────────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: info.$3.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: info.$3.withOpacity(0.25)),
+              color: info.$3.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: info.$3.withOpacity(0.2), width: 1.5),
             ),
             child: Row(
               children: [
-                Text(info.$1, style: const TextStyle(fontSize: 22)),
-                const SizedBox(width: 12),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: info.$3.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(info.$1, style: const TextStyle(fontSize: 24)),
+                  ),
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -474,15 +451,19 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                             ? 'ทิศ${_direction.label(widget.lang)}'
                             : '${_direction.label(widget.lang)} Facing',
                         style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                           color: info.$3,
                         ),
                       ),
+                      const SizedBox(height: 3),
                       Text(
                         info.$2,
                         style: GoogleFonts.notoSansThai(
-                            fontSize: 12, color: Colors.black54, height: 1.4),
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
                       ),
                     ],
                   ),
@@ -492,6 +473,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
           ),
           const SizedBox(height: 28),
 
+          // ── CTA ─────────────────────────────────────────────────
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -499,7 +481,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
                 elevation: 0,
@@ -510,7 +492,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                   Text(
                     _isTh ? 'ถัดไป' : 'Next',
                     style: GoogleFonts.outfit(
-                        fontSize: 15, fontWeight: FontWeight.w600),
+                        fontSize: 16, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(width: 6),
                   const Icon(Icons.arrow_forward_rounded, size: 18),
@@ -546,7 +528,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.arrow_back_ios_new,
@@ -564,7 +546,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                         Text(
                           _isTh ? 'คำถามที่' : 'Question',
                           style: GoogleFonts.outfit(
-                              fontSize: 12, color: Colors.black38),
+                              fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                         ),
                         Text(
                           '${index + 1} / ${_questions.length}',
@@ -578,13 +560,13 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                     ),
                     const SizedBox(height: 6),
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: (index + 1) / _questions.length,
-                        backgroundColor: AppColors.primary.withOpacity(0.1),
+                        backgroundColor: AppColors.primary.withOpacity(0.08),
                         valueColor:
                             AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        minHeight: 5,
+                        minHeight: 3,
                       ),
                     ),
                   ],
@@ -599,7 +581,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
             style: GoogleFonts.notoSansThai(
               fontSize: 19,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1A2820),
+              color: Theme.of(context).colorScheme.onSurface,
               height: 1.5,
             ),
           ),
@@ -610,58 +592,53 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
             return GestureDetector(
               onTap: () => setState(() => _answers[index] = i),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                margin: const EdgeInsets.only(bottom: 10),
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.only(bottom: 8),
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  color: isSelected
+                      ? AppColors.primary.withOpacity(0.10)
+                      : Theme.of(context).colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: isSelected
                         ? AppColors.primary
-                        : Colors.black.withOpacity(0.08),
+                        : Theme.of(context).colorScheme.outline.withOpacity(0.3),
+                    width: isSelected ? 1.5 : 1,
                   ),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withOpacity(0.18),
-                            blurRadius: 10,
-                            offset: const Offset(0, 3),
-                          )
-                        ]
-                      : [],
                 ),
                 child: Row(
                   children: [
                     Container(
-                      width: 26,
-                      height: 26,
+                      width: 24,
+                      height: 24,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.25)
-                            : AppColors.primary.withOpacity(0.07),
+                        color:
+                            isSelected ? AppColors.primary : AppColors.chipBg,
                       ),
                       child: Center(
                         child: Text(
                           String.fromCharCode(65 + i),
                           style: GoogleFonts.outfit(
-                            fontSize: 12,
+                            fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color:
-                                isSelected ? Colors.white : AppColors.primary,
+                            color: isSelected
+                                ? Colors.white
+                                : AppColors.textSecondary,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         options[i],
                         style: GoogleFonts.notoSansThai(
                           fontSize: 14,
-                          color: isSelected ? Colors.white : Colors.black87,
+                          color:
+                              isSelected ? AppColors.primary : Theme.of(context).colorScheme.onSurface,
                           fontWeight:
                               isSelected ? FontWeight.w600 : FontWeight.normal,
                         ),
@@ -669,7 +646,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                     ),
                     if (isSelected)
                       const Icon(Icons.check_circle_rounded,
-                          color: Colors.white, size: 18),
+                          color: AppColors.primary, size: 18),
                   ],
                 ),
               ),
@@ -684,7 +661,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.black.withOpacity(0.08),
+                disabledBackgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                 padding: const EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14)),
@@ -752,7 +729,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                     Text(
                       _isTh ? 'คะแนนแสง' : 'Light Score',
                       style: GoogleFonts.outfit(
-                          fontSize: 12, color: Colors.black45),
+                          fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                     const Spacer(),
                     Text(
@@ -767,12 +744,12 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                 ),
                 const SizedBox(height: 6),
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: _totalScore / 12,
-                    backgroundColor: result.color.withOpacity(0.15),
+                    backgroundColor: result.color.withOpacity(0.10),
                     valueColor: AlwaysStoppedAnimation<Color>(result.color),
-                    minHeight: 8,
+                    minHeight: 5,
                   ),
                 ),
               ],
@@ -784,9 +761,9 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.black.withOpacity(0.07)),
+              border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.2)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -814,7 +791,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
             style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: const Color(0xFF1A2820),
+              color: Theme.of(context).colorScheme.onSurface,
             ),
           ),
           Text(
@@ -822,7 +799,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                 ? 'กดที่ชื่อต้นไม้เพื่อดูรายละเอียด'
                 : 'Tap a plant name for details',
             style:
-                GoogleFonts.notoSansThai(fontSize: 12, color: Colors.black38),
+                GoogleFonts.notoSansThai(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 10),
           Wrap(
@@ -845,12 +822,12 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                   decoration: BoxDecoration(
                     color: hasData
                         ? result.color.withOpacity(0.1)
-                        : Colors.black.withOpacity(0.04),
+                        : Theme.of(context).colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: hasData
                           ? result.color.withOpacity(0.5)
-                          : Colors.black.withOpacity(0.08),
+                          : Theme.of(context).colorScheme.outline.withOpacity(0.2),
                     ),
                   ),
                   child: Row(
@@ -860,7 +837,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                         plants[i],
                         style: GoogleFonts.notoSansThai(
                           fontSize: 13,
-                          color: hasData ? result.color : Colors.black54,
+                          color: hasData ? result.color : Theme.of(context).colorScheme.onSurfaceVariant,
                           fontWeight:
                               hasData ? FontWeight.w600 : FontWeight.normal,
                         ),
@@ -882,9 +859,9 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0F7F0),
+              color: AppColors.primary.withOpacity(0.08),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -917,7 +894,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                       Text(
                         tip,
                         style: GoogleFonts.notoSansThai(
-                            fontSize: 13, height: 1.5, color: Colors.black87),
+                            fontSize: 13, height: 1.5, color: Theme.of(context).colorScheme.onSurface),
                       ),
                     ],
                   ),
@@ -965,11 +942,14 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
         minChildSize: 0.4,
         maxChildSize: 0.92,
         expand: false,
-        builder: (ctx, scrollCtrl) => Container(
-          decoration: const BoxDecoration(
-            color: Color(0xFFF7F9F5),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
+        builder: (ctx, scrollCtrl) {
+          final sheetTheme = Theme.of(ctx);
+          return Container(
+            decoration: BoxDecoration(
+              color: sheetTheme.colorScheme.surface,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
           child: Column(
             children: [
               // Handle
@@ -978,7 +958,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.black12,
+                  color: sheetTheme.colorScheme.outline.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -1030,7 +1010,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                                   style: GoogleFonts.outfit(
                                     fontSize: 13,
                                     fontStyle: FontStyle.italic,
-                                    color: Colors.black38,
+                                    color: sheetTheme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -1062,7 +1042,7 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                         style: GoogleFonts.notoSansThai(
                           fontSize: 14,
                           height: 1.6,
-                          color: Colors.black87,
+                          color: sheetTheme.colorScheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -1076,11 +1056,11 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                         Container(
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFF8E1),
+                            color: const Color(0xFFFFCC02).withOpacity(0.12),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                                 color:
-                                    const Color(0xFFFFCC02).withOpacity(0.4)),
+                                    const Color(0xFFFFCC02).withOpacity(0.35)),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,11 +1102,12 @@ class _LightAdvisorScreenState extends State<LightAdvisorScreen>
                 ),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
+
 
   String _lightLabel(Light light, bool isTh) {
     switch (light) {
@@ -1261,7 +1242,7 @@ class _FactsGrid extends StatelessWidget {
                       f.$2,
                       style: GoogleFonts.outfit(
                         fontSize: 10,
-                        color: Colors.black38,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     Text(
@@ -1269,7 +1250,7 @@ class _FactsGrid extends StatelessWidget {
                       style: GoogleFonts.notoSansThai(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1313,17 +1294,10 @@ class _RoomLayoutWidgetState extends State<_RoomLayoutWidget> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 220,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outline.withOpacity(0.15)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20),
@@ -1591,91 +1565,155 @@ class _RoomPainter extends CustomPainter {
 }
 
 // ─────────────────────────────────────────────
-// Compass Picker
+// Visual Compass Wheel Widget
 // ─────────────────────────────────────────────
 
-class _CompassPicker extends StatelessWidget {
+class _VisualCompassWheel extends StatelessWidget {
   final RoomDirection selected;
-  final String lang;
   final ValueChanged<RoomDirection> onSelected;
 
-  const _CompassPicker({
+  const _VisualCompassWheel({
     required this.selected,
-    required this.lang,
     required this.onSelected,
   });
 
-  // 3×3 grid layout order (null = center spacer)
-  static const _grid = [
-    RoomDirection.northwest,
-    RoomDirection.north,
-    RoomDirection.northeast,
-    RoomDirection.west,
-    null,
-    RoomDirection.east,
-    RoomDirection.southwest,
-    RoomDirection.south,
-    RoomDirection.southeast,
+  // Direction data: (direction, shortLabel, icon, angle label)
+  static const _dirs = [
+    (RoomDirection.north, 'N', '↑'),
+    (RoomDirection.northeast, 'NE', '↗'),
+    (RoomDirection.east, 'E', '→'),
+    (RoomDirection.southeast, 'SE', '↘'),
+    (RoomDirection.south, 'S', '↓'),
+    (RoomDirection.southwest, 'SW', '↙'),
+    (RoomDirection.west, 'W', '←'),
+    (RoomDirection.northwest, 'NW', '↖'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 3,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 6,
-      crossAxisSpacing: 6,
-      childAspectRatio: 1.8,
-      children: _grid.map((dir) {
-        if (dir == null) {
-          // center: compass emoji
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.03),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Center(
-              child: Text('🧭', style: TextStyle(fontSize: 20)),
-            ),
-          );
-        }
-        final isSelected = dir == selected;
-        return GestureDetector(
-          onTap: () => onSelected(dir),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : Colors.white,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected
-                    ? AppColors.primary
-                    : Colors.black.withOpacity(0.08),
-              ),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.2),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      )
-                    ]
-                  : [],
-            ),
-            child: Center(
-              child: Text(
-                dir.shortLabel,
-                style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: isSelected ? Colors.white : Colors.black54,
+    return Column(
+      children: [
+        // ── Top row: NW  N  NE ──────────────────────────
+        Row(
+          children: [
+            _dirButton(context, _dirs[7]), // NW
+            const SizedBox(width: 10),
+            _dirButton(context, _dirs[0]), // N
+            const SizedBox(width: 10),
+            _dirButton(context, _dirs[1]), // NE
+          ],
+        ),
+        const SizedBox(height: 10),
+        // ── Middle row: W  [center]  E ──────────────────
+        Row(
+          children: [
+            _dirButton(context, _dirs[6]), // W
+            const SizedBox(width: 10),
+            // Center plate
+            Expanded(
+              child: Container(
+                height: 76,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                      color: AppColors.primary.withOpacity(0.18), width: 1.5),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('🧭', style: TextStyle(fontSize: 28)),
+                    const SizedBox(height: 3),
+                    Text(
+                      selected.shortLabel,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(width: 10),
+            _dirButton(context, _dirs[2]), // E
+          ],
+        ),
+        const SizedBox(height: 10),
+        // ── Bottom row: SW  S  SE ────────────────────────
+        Row(
+          children: [
+            _dirButton(context, _dirs[5]), // SW
+            const SizedBox(width: 10),
+            _dirButton(context, _dirs[4]), // S
+            const SizedBox(width: 10),
+            _dirButton(context, _dirs[3]), // SE
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _dirButton(BuildContext context, (RoomDirection, String, String) data) {
+    final dir = data.$1;
+    final label = data.$2;
+    final arrow = data.$3;
+    final isSelected = dir == selected;
+
+    final theme = Theme.of(context);
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onSelected(dir),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          height: 76,
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected
+                  ? AppColors.primary
+                  : theme.colorScheme.outline.withOpacity(0.3),
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.25),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    )
+                  ]
+                : null,
           ),
-        );
-      }).toList(),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                arrow,
+                style: TextStyle(
+                  fontSize: 22,
+                  color: isSelected
+                      ? Colors.white60
+                      : theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  height: 1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: GoogleFonts.outfit(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1728,7 +1766,7 @@ class _DirectionInfoCard extends StatelessWidget {
                   info.$2,
                   style: GoogleFonts.notoSansThai(
                     fontSize: 13,
-                    color: Colors.black54,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     height: 1.4,
                   ),
                 ),

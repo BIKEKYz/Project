@@ -7,6 +7,8 @@ class AppSettingsDatabase {
   static const _keySound = 'settings_watering_sound';
   static const _keyLanguage = 'settings_language';
   static const _keyDarkMode = 'settings_dark_mode';
+  static const _keyTextScale = 'settings_text_scale';
+  static const _keyNotif = 'settings_notifications_enabled';
 
   Future<AppSettings?> getSettings(String userId) async {
     final prefs = await SharedPreferences.getInstance();
@@ -15,6 +17,8 @@ class AppSettingsDatabase {
       wateringSound: prefs.getString(_keySound) ?? 'default',
       language: prefs.getString(_keyLanguage) ?? 'th',
       darkMode: prefs.getBool(_keyDarkMode) ?? false,
+      textScale: prefs.getDouble(_keyTextScale) ?? 1.0,
+      notificationsEnabled: prefs.getBool(_keyNotif) ?? true,
     );
   }
 
@@ -23,6 +27,8 @@ class AppSettingsDatabase {
     await prefs.setString(_keySound, settings.wateringSound);
     await prefs.setString(_keyLanguage, settings.language);
     await prefs.setBool(_keyDarkMode, settings.darkMode);
+    await prefs.setDouble(_keyTextScale, settings.textScale);
+    await prefs.setBool(_keyNotif, settings.notificationsEnabled);
   }
 
   Future<void> deleteSettings(String userId) async {

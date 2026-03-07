@@ -12,6 +12,13 @@ class AppSettingsStore with ChangeNotifier {
   String get wateringSound => _settings?.wateringSound ?? 'default';
   String get language => _settings?.language ?? 'th';
   bool get darkMode => _settings?.darkMode ?? false;
+  double get textScale => _settings?.textScale ?? 1.0;
+  bool get notificationsEnabled => _settings?.notificationsEnabled ?? true;
+
+  // ✅ Auto-load on creation (same pattern as UserProfileStore)
+  AppSettingsStore() {
+    loadSettings();
+  }
 
   Future<void> loadSettings() async {
     // Use a fixed local user ID for offline mode
@@ -87,6 +94,38 @@ class AppSettingsStore with ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error toggling dark mode: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateTextScale(double scale) async {
+    if (_settings == null) return;
+    try {
+      _settings = _settings!.copyWith(
+        textScale: scale,
+        updatedAt: DateTime.now(),
+      );
+      final db = AppSettingsDatabase();
+      await db.saveSettings(_settings!);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error updating text scale: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> toggleNotifications() async {
+    if (_settings == null) return;
+    try {
+      _settings = _settings!.copyWith(
+        notificationsEnabled: !_settings!.notificationsEnabled,
+        updatedAt: DateTime.now(),
+      );
+      final db = AppSettingsDatabase();
+      await db.saveSettings(_settings!);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error toggling notifications: $e');
       rethrow;
     }
   }

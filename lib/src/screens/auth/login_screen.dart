@@ -55,8 +55,13 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
 
       // Save to SharedPreferences so _AuthGate recognises login state
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(
-          'offline_user_name', user?.displayName ?? 'Plant Lover');
+      // ✅ Preserve custom name if user already edited it manually
+      final hasCustomName = prefs.getBool('offline_user_name_custom') ?? false;
+      if (!hasCustomName) {
+        // First-time Google login — use Google account name
+        await prefs.setString(
+            'offline_user_name', user?.displayName ?? 'Plant Lover');
+      }
       await prefs.setString('offline_user_email', user?.email ?? '');
       await prefs.setBool('offline_logged_in', true);
       await prefs.setString('auth_provider', 'google');
@@ -138,7 +143,11 @@ class _LoginSignupScreenState extends State<LoginSignupScreen> {
   ) async {
     await prefs.setString('offline_user_email', email);
     await prefs.setString('offline_user_pass', pass);
-    await prefs.setString('offline_user_name', name);
+    // Only update name if not already customized (re-login keeps saved name)
+    final hasCustomName = prefs.getBool('offline_user_name_custom') ?? false;
+    if (!hasCustomName) {
+      await prefs.setString('offline_user_name', name);
+    }
     await prefs.setBool('offline_logged_in', true);
     await prefs.setString('auth_provider', 'local');
     _navigateHome(prefs);

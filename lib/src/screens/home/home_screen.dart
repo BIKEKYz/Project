@@ -20,6 +20,7 @@ import '../../widgets/notification_bell.dart';
 import '../light/light_advisor_screen.dart';
 import '../detail/plant_detail_screen.dart';
 import '../compare/plant_compare_screen.dart';
+import '../../widgets/weather_plant_banner.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -80,41 +81,11 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _MinimalNavBar(
         selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF1A2820)
-            : Colors.white,
-        elevation: 10,
-        shadowColor: Colors.black.withOpacity(0.1),
-        indicatorColor: AppColors.secondary.withOpacity(0.2),
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.explore_outlined),
-            selectedIcon:
-                const Icon(Icons.explore_rounded, color: AppColors.primary),
-            label: s.explore,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.yard_outlined),
-            selectedIcon:
-                const Icon(Icons.yard_rounded, color: AppColors.primary),
-            label: s.myGarden,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.wb_sunny_outlined),
-            selectedIcon:
-                const Icon(Icons.wb_sunny_rounded, color: AppColors.primary),
-            label: s.lightAdvisor,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.settings_outlined),
-            selectedIcon:
-                const Icon(Icons.settings_rounded, color: AppColors.primary),
-            label: s.settings,
-          ),
-        ],
+        onTap: (i) => setState(() => _tab = i),
+        labels: [s.explore, s.myGarden, s.lightAdvisor, s.settings],
+        isDark: Theme.of(context).brightness == Brightness.dark,
       ),
     );
   }
@@ -131,54 +102,30 @@ class _HomeScreenState extends State<HomeScreen> {
     final filtered = filter.apply(all);
 
     return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
-            expandedHeight: 140,
+            expandedHeight: 60,
             pinned: true,
-            backgroundColor: AppColors.background,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
             surfaceTintColor: Colors.transparent,
+            elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 12),
               title: Text(
                 s.welcomeUser(profileStore.profile?.displayName ?? 'Plantify'),
                 style: GoogleFonts.outfit(
                   color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 17,
                 ),
-              ),
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.asset(
-                    'assets/hero/leaves.jpg',
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) =>
-                        Container(color: AppColors.tertiary.withOpacity(0.3)),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.white.withOpacity(0.1),
-                          AppColors.background.withOpacity(0.8),
-                          AppColors.background,
-                        ],
-                        stops: const [0.0, 0.7, 1.0],
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
             actions: [
-              // Compare button
               IconButton(
                 icon: const Icon(Icons.compare_arrows_rounded,
-                    color: AppColors.primary),
+                    color: AppColors.primary, size: 20),
                 tooltip: 'เปรียบเทียบต้นไม้',
                 onPressed: () => Navigator.push(
                   context,
@@ -187,9 +134,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ),
-              // Notification Bell
               Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 6),
                 child: NotificationBell(
                   activityStore: activityStore,
                   lang: lang,
@@ -201,48 +147,73 @@ class _HomeScreenState extends State<HomeScreen> {
           // ── Search bar + quick chips ────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Search Bar
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 3),
+                  // Search Bar — minimal
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: AppColors.chipBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: TextField(
+                            onChanged: filter.setQuery,
+                            style: GoogleFonts.notoSansThai(
+                                fontSize: 14, color: AppColors.textPrimary),
+                            decoration: InputDecoration(
+                              hintText: s.searchPlants,
+                              hintStyle: GoogleFonts.notoSansThai(
+                                  color: AppColors.textSecondary, fontSize: 14),
+                              prefixIcon: const Icon(Icons.search_rounded,
+                                  color: AppColors.primary, size: 18),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 11),
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: TextField(
-                      onChanged: filter.setQuery,
-                      decoration: InputDecoration(
-                        hintText: s.searchPlants,
-                        hintStyle: const TextStyle(color: AppColors.outline),
-                        prefixIcon:
-                            const Icon(Icons.search, color: AppColors.primary),
-                        suffixIcon: IconButton(
-                          icon:
-                              const Icon(Icons.tune, color: AppColors.primary),
-                          onPressed: () => _openFilterSheet(context, filter, s),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => _openFilterSheet(context, filter, s),
+                        child: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: filter.hasFilters
+                                ? AppColors.primary
+                                : AppColors.chipBg,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.tune_rounded,
+                            size: 18,
+                            color: filter.hasFilters
+                                ? Colors.white
+                                : AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 10),
                   // Quick Filter Chips
                   _QuickFilterChips(filter: filter, lang: lang),
                 ],
               ),
             ),
           ),
+
+          // ── Weather + Plant Recommendation ─────────────────────────────
+          if (filter.query.isEmpty && !filter.hasFilters)
+            SliverToBoxAdapter(
+              child: WeatherPlantBanner(lang: lang),
+            ),
 
           // ── Body: either search results or sections ──────────────
           if (filter.query.isNotEmpty || filter.hasFilters) ...[
@@ -370,17 +341,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
                 child: Row(
                   children: [
+                    Container(
+                      width: 3,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       lang == 'en'
-                          ? '🌿 All Plants (${all.length})'
-                          : '🌿 ต้นไม้ทั้งหมด (${all.length} ชนิด)',
+                          ? 'All Plants (${all.length})'
+                          : 'ต้นไม้ทั้งหมด (${all.length} ชนิด)',
                       style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
@@ -426,9 +406,9 @@ class _HomeScreenState extends State<HomeScreen> {
         maxChildSize: 0.95,
         minChildSize: 0.5,
         builder: (_, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             children: [
@@ -438,7 +418,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color:
+                        Theme.of(context).colorScheme.outline.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -523,7 +504,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               labelStyle: TextStyle(
                                 color: isSelected
                                     ? AppColors.primary
-                                    : Colors.black87,
+                                    : Theme.of(context).colorScheme.onSurface,
                                 fontWeight: isSelected
                                     ? FontWeight.bold
                                     : FontWeight.normal,
@@ -533,7 +514,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppColors.primary
-                                      : Colors.grey.shade300,
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withOpacity(0.5),
                                 ),
                               ),
                             );
@@ -560,7 +544,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               labelStyle: TextStyle(
                                 color: isSelected
                                     ? AppColors.primary
-                                    : Colors.black87,
+                                    : Theme.of(context).colorScheme.onSurface,
                                 fontWeight: isSelected
                                     ? FontWeight.bold
                                     : FontWeight.normal,
@@ -570,7 +554,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                 side: BorderSide(
                                   color: isSelected
                                       ? AppColors.primary
-                                      : Colors.grey.shade300,
+                                      : Theme.of(context)
+                                          .colorScheme
+                                          .outline
+                                          .withOpacity(0.5),
                                 ),
                               ),
                             );
@@ -581,9 +568,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       Container(
                         decoration: BoxDecoration(
-                          color: Colors.grey[50],
+                          color:
+                              Theme.of(context).colorScheme.surfaceContainerLow,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey[200]!),
+                          border: Border.all(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .outline
+                                  .withOpacity(0.2)),
                         ),
                         child: Column(
                           children: [
@@ -595,7 +587,12 @@ class _HomeScreenState extends State<HomeScreen> {
                               contentPadding:
                                   const EdgeInsets.symmetric(horizontal: 16),
                             ),
-                            Divider(height: 1, color: Colors.grey[200]),
+                            Divider(
+                                height: 1,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outline
+                                    .withOpacity(0.2)),
                             SwitchListTile(
                               title: Text(s.airPurifyingOnly),
                               value: filter.onlyAirPurifying,
@@ -667,73 +664,70 @@ class _QuickFilterChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final chips = [
       _ChipData(
-        labelTh: '🌱 ง่าย',
-        labelEn: '🌱 Easy',
+        labelTh: 'ง่าย',
+        labelEn: 'Easy',
         isActive: filter.difficulty == Difficulty.easy,
         onTap: () => filter.difficulty == Difficulty.easy
             ? filter.setDifficulty(null)
             : filter.setDifficulty(Difficulty.easy),
       ),
       _ChipData(
-        labelTh: '☀️ แสงจ้า',
-        labelEn: '☀️ Bright',
+        labelTh: 'แสงจ้า',
+        labelEn: 'Bright',
         isActive: filter.light == Light.bright,
         onTap: () => filter.light == Light.bright
             ? filter.setLight(null)
             : filter.setLight(Light.bright),
       ),
       _ChipData(
-        labelTh: '🌑 แสงน้อย',
-        labelEn: '🌑 Low Light',
+        labelTh: 'แสงน้อย',
+        labelEn: 'Low Light',
         isActive: filter.light == Light.low,
         onTap: () => filter.light == Light.low
             ? filter.setLight(null)
             : filter.setLight(Light.low),
       ),
       _ChipData(
-        labelTh: '🐾 ปลอดภัย',
-        labelEn: '🐾 Pet Safe',
+        labelTh: 'ปลอดภัย',
+        labelEn: 'Pet Safe',
         isActive: filter.onlyPetSafe,
         onTap: () => filter.togglePetSafe(),
       ),
       _ChipData(
-        labelTh: '💨 ฟอกอากาศ',
-        labelEn: '💨 Air Purify',
+        labelTh: 'ฟอกอากาศ',
+        labelEn: 'Air Purify',
         isActive: filter.onlyAirPurifying,
         onTap: () => filter.toggleAirPurifying(),
       ),
     ];
 
     return SizedBox(
-      height: 36,
+      height: 32,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: chips.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (context, i) {
           final c = chips[i];
           return GestureDetector(
             onTap: c.onTap,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: c.isActive
-                    ? AppColors.primary
-                    : AppColors.primary.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(20),
+                color: c.isActive ? AppColors.primary : AppColors.chipBg,
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: c.isActive
-                      ? AppColors.primary
-                      : AppColors.primary.withOpacity(0.15),
+                  color: c.isActive ? AppColors.primary : AppColors.outline,
+                  width: 0.8,
                 ),
               ),
               child: Text(
                 _isTh ? c.labelTh : c.labelEn,
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: c.isActive ? Colors.white : AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: c.isActive ? FontWeight.w600 : FontWeight.w400,
+                  color: c.isActive ? Colors.white : AppColors.textSecondary,
                 ),
               ),
             ),
@@ -796,19 +790,12 @@ class _PlantOfTheDay extends StatelessWidget {
         ),
       ),
       child: Container(
-        height: 200,
+        height: 185,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.15),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(16),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -958,14 +945,27 @@ class _CategorySection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-          child: Text(
-            _isTh ? titleTh : titleEn,
-            style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.primary,
-            ),
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
+          child: Row(
+            children: [
+              Container(
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _isTh ? titleTh : titleEn,
+                style: GoogleFonts.outfit(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
           ),
         ),
         SizedBox(
@@ -1802,13 +1802,16 @@ class _SeasonTipCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // In dark mode blend accent colour heavily so card is readable on dark bg
+    final cardColor = isDark ? tip.accent.withOpacity(0.15) : tip.color;
     return Container(
       width: 200,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: tip.color,
+        color: cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: tip.accent.withOpacity(0.2)),
+        border: Border.all(color: tip.accent.withOpacity(isDark ? 0.35 : 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1845,6 +1848,88 @@ class _SeasonTipCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Minimal Bottom Nav Bar ───────────────────────────────────────────────────
+
+class _MinimalNavBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+  final List<String> labels;
+  final bool isDark;
+
+  const _MinimalNavBar({
+    required this.selectedIndex,
+    required this.onTap,
+    required this.labels,
+    required this.isDark,
+  });
+
+  static const List<List<IconData>> _icons = [
+    [Icons.explore_outlined, Icons.explore_rounded],
+    [Icons.yard_outlined, Icons.yard_rounded],
+    [Icons.wb_sunny_outlined, Icons.wb_sunny_rounded],
+    [Icons.settings_outlined, Icons.settings_rounded],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = isDark ? const Color(0xFF0F1A14) : Colors.white;
+    final borderColor =
+        isDark ? const Color(0xFF1E3028) : const Color(0xFFEEEEEE);
+    final activeColor = AppColors.primary;
+    final inactiveColor =
+        isDark ? const Color(0xFF3A5040) : const Color(0xFFBBBBBB);
+
+    return Container(
+      height: 58 + MediaQuery.of(context).padding.bottom,
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          top: BorderSide(color: borderColor, width: 1),
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+        child: Row(
+          children: List.generate(labels.length, (i) {
+            final isSelected = i == selectedIndex;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isSelected ? _icons[i][1] : _icons[i][0],
+                        size: 22,
+                        color: isSelected ? activeColor : inactiveColor,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        labels[i],
+                        style: GoogleFonts.outfit(
+                          fontSize: 10,
+                          fontWeight:
+                              isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected ? activeColor : inactiveColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

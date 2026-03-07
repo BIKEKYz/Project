@@ -14,6 +14,7 @@ import 'src/data/stores/plant_filter.dart';
 import 'src/data/stores/app_settings_store.dart';
 import 'src/data/stores/activity_store.dart';
 import 'src/database.dart';
+import 'src/data/stores/weather_store.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +59,7 @@ class PlantifyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserStatsStore()),
         ChangeNotifierProvider(create: (_) => CareStore()),
         ChangeNotifierProvider(create: (_) => PlantFilter()),
+        ChangeNotifierProvider(create: (_) => WeatherStore()),
       ],
       child: Consumer<AppSettingsStore>(
         builder: (context, settings, _) {
@@ -67,6 +69,13 @@ class PlantifyApp extends StatelessWidget {
             themeMode: settings.darkMode ? ThemeMode.dark : ThemeMode.light,
             theme: _buildLightTheme(),
             darkTheme: _buildDarkTheme(),
+            // ✅ Apply text scale globally across all screens
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(settings.textScale),
+              ),
+              child: child!,
+            ),
             home: const SplashScreen(),
           );
         },
@@ -87,18 +96,24 @@ class PlantifyApp extends StatelessWidget {
       cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: Colors.white,
+        color: AppColors.cardBg,
         margin: EdgeInsets.zero,
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
         titleTextStyle: GoogleFonts.outfit(
           color: AppColors.primary,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
         ),
-        iconTheme: const IconThemeData(color: AppColors.primary),
+        iconTheme: const IconThemeData(color: AppColors.primary, size: 21),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.divider,
+        thickness: 1,
+        space: 0,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -107,23 +122,23 @@ class PlantifyApp extends StatelessWidget {
           elevation: 0,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 24),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.chipBg,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }
@@ -152,12 +167,18 @@ class PlantifyApp extends StatelessWidget {
       appBarTheme: AppBarTheme(
         backgroundColor: darkBg,
         surfaceTintColor: Colors.transparent,
+        elevation: 0,
         titleTextStyle: GoogleFonts.outfit(
           color: const Color(0xFF7DC99A),
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
         ),
-        iconTheme: const IconThemeData(color: Color(0xFF7DC99A)),
+        iconTheme: const IconThemeData(color: Color(0xFF7DC99A), size: 22),
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.white.withOpacity(0.06),
+        thickness: 1,
+        space: 0,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -166,24 +187,24 @@ class PlantifyApp extends StatelessWidget {
           elevation: 0,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
-          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 24),
+          textStyle: GoogleFonts.outfit(fontWeight: FontWeight.w600),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: darkCard,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
         ),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: darkCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }

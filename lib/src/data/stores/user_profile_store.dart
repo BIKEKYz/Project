@@ -9,6 +9,8 @@ class UserProfileStore with ChangeNotifier {
   static const _keyName = 'offline_user_name';
   static const _keyEmail = 'offline_user_email';
   static const _keyPhotoPath = 'offline_user_photo_path';
+  static const _keyNameCustom =
+      'offline_user_name_custom'; // user edited name flag
 
   UserProfile? _profile;
   UserProfile? get profile => _profile;
@@ -69,6 +71,8 @@ class UserProfileStore with ChangeNotifier {
     // Also update the shared prefs key used by AuthGate
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyName, newName.trim());
+    // ✅ Mark that the user has manually customised their display name
+    await prefs.setBool(_keyNameCustom, true);
 
     _isLoading = false;
     notifyListeners();

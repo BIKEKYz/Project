@@ -45,17 +45,17 @@ class PlantCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(16),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -66,14 +66,14 @@ class PlantCard extends StatelessWidget {
                   plant.image,
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => Container(
-                    color: AppColors.tertiary.withOpacity(0.3),
+                    color: AppColors.tertiary.withOpacity(0.2),
                     child: const Icon(Icons.image_not_supported,
                         color: Colors.white54),
                   ),
                 ),
               ),
 
-              // Gradient Overlay
+              // Gradient Overlay — light and subtle
               Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -81,10 +81,10 @@ class PlantCard extends StatelessWidget {
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      Colors.black.withOpacity(0.2),
-                      Colors.black.withOpacity(0.8),
+                      Colors.black.withOpacity(0.10),
+                      Colors.black.withOpacity(0.62),
                     ],
-                    stops: const [0.4, 0.7, 1.0],
+                    stops: const [0.45, 0.70, 1.0],
                   ),
                 ),
               ),
@@ -102,23 +102,23 @@ class PlantCard extends StatelessWidget {
                       plant.nameEn,
                       style: GoogleFonts.outfit(
                         color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       plant.nameTh,
                       style: GoogleFonts.notoSansThai(
-                        color: Colors.white.withOpacity(0.9),
-                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 12,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         if (daysLeft <= 0)
@@ -141,23 +141,22 @@ class PlantCard extends StatelessWidget {
 
               // Favorite Button
               Positioned(
-                top: 12,
-                right: 12,
+                top: 10,
+                right: 10,
                 child: ClipOval(
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                    filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
                     child: Container(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withOpacity(0.15),
                       child: IconButton(
                         icon: Icon(
                           isFav ? Icons.favorite : Icons.favorite_border,
                           color: isFav ? AppColors.error : Colors.white,
-                          size: 20,
+                          size: 18,
                         ),
                         onPressed: () {
                           final wasAlreadyFav = fav.isFavorite(plant.id);
                           fav.toggle(plant.id);
-                          // Log to activity store
                           try {
                             final activityStore = Provider.of<ActivityStore>(
                                 context,
@@ -171,8 +170,8 @@ class PlantCard extends StatelessWidget {
                           } catch (_) {}
                         },
                         constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
+                          minWidth: 36,
+                          minHeight: 36,
                         ),
                         padding: EdgeInsets.zero,
                       ),

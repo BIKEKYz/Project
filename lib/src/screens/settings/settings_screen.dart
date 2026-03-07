@@ -107,31 +107,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
         slivers: [
           // ── App Bar ──────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 160,
+            expandedHeight: 80,
             pinned: true,
             surfaceTintColor: Colors.transparent,
+            elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
               title: Text(
-                lang == 'en' ? 'Settings ⚙️' : 'ตั้งค่า ⚙️',
+                lang == 'en' ? 'Settings' : 'ตั้งค่า',
                 style: GoogleFonts.outfit(
                   color: isDark ? const Color(0xFF7DC99A) : AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: isDark
-                        ? [const Color(0xFF1A2820), const Color(0xFF0F1A14)]
-                        : [
-                            AppColors.secondary.withOpacity(0.08),
-                            AppColors.background,
-                          ],
-                  ),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
                 ),
               ),
             ),
@@ -155,6 +142,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     isDark,
                     children: [
                       _buildDarkModeRow(isDark),
+                      _buildDivider(isDark),
+                      _buildTextSizeRow(isDark),
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -166,6 +155,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildCard(
                     isDark,
                     children: [
+                      _buildNotificationToggleRow(isDark),
+                      _buildDivider(isDark),
                       _buildSoundRow(context, isDark),
                     ],
                   ),
@@ -197,34 +188,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : const Color(0xFFFFF0F0),
                         title: lang == 'en' ? 'Sign Out' : 'ออกจากระบบ',
                         titleColor: AppColors.error,
-                        onTap: () async {
-                          final prefs = await SharedPreferences.getInstance();
-                          await prefs.setBool('offline_logged_in', false);
-                          if (context.mounted) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                  builder: (_) => const LoginSignupScreen()),
-                              (_) => false,
-                            );
-                          }
-                        },
+                        onTap: () => _confirmSignOut(context, isDark),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 40),
+                  const SizedBox(height: 20),
 
-                  // ── App version ───────────────────────────────
-                  Center(
-                    child: Text(
-                      'Plantify v1.0.0',
-                      style: GoogleFonts.outfit(
-                        fontSize: 12,
-                        color: isDark
-                            ? const Color(0xFF3A5040)
-                            : const Color(0xFFBDBDBD),
-                      ),
-                    ),
-                  ),
+                  // ── About ─────────────────────────────────────
+                  _sectionLabel(lang == 'en' ? 'ABOUT' : 'เกี่ยวกับ', isDark),
+                  const SizedBox(height: 8),
+                  _buildAboutCard(isDark),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -245,20 +218,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return GestureDetector(
       onTap: () => _showEditProfileSheet(context, isDark, name, photoURL),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF1E3028) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isDark ? const Color(0xFF2A4035) : const Color(0xFFF0F0F0),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Row(
           children: [
@@ -266,8 +232,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Stack(
               children: [
                 CircleAvatar(
-                  radius: 28,
-                  backgroundColor: AppColors.primary.withOpacity(0.15),
+                  radius: 24,
+                  backgroundColor: AppColors.primary.withOpacity(0.10),
                   backgroundImage:
                       (photoURL != null && File(photoURL).existsSync())
                           ? FileImage(File(photoURL))
@@ -935,6 +901,230 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  // ── Divider between rows ──────────────────────────────────────────────────────
+  Widget _buildDivider(bool isDark) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: Divider(
+          height: 1,
+          color: isDark ? const Color(0xFF2A4035) : const Color(0xFFF0F0F0),
+        ),
+      );
+
+  // ── Text Size Row ─────────────────────────────────────────────────────────────
+  Widget _buildTextSizeRow(bool isDark) {
+    final current = store?.textScale ?? 1.0;
+    final sizes = [
+      (0.9, lang == 'en' ? 'S' : 'เล็ก', lang == 'en' ? 'A' : 'ก'),
+      (1.0, lang == 'en' ? 'M' : 'กลาง', lang == 'en' ? 'Aa' : 'กก'),
+      (1.15, lang == 'en' ? 'L' : 'ใหญ่', lang == 'en' ? 'Aaa' : 'กกก'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Row(
+        children: [
+          _SettingIcon(
+            emoji: '✍️',
+            bgColor: isDark ? const Color(0xFF2A3040) : const Color(0xFFEEF2FF),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lang == 'en' ? 'Text Size' : 'ขนาดตัวอักษร',
+                  style: _titleStyle(isDark),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: sizes.map((s) {
+                    final isActive = (current - s.$1).abs() < 0.01;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          await store?.updateTextScale(s.$1);
+                          setState(() {});
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          margin: const EdgeInsets.only(right: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.primary
+                                : (isDark
+                                    ? const Color(0xFF1A2820)
+                                    : const Color(0xFFF5F5F5)),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isActive
+                                  ? AppColors.primary
+                                  : (isDark
+                                      ? const Color(0xFF2A4035)
+                                      : const Color(0xFFE0E0E0)),
+                            ),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                s.$3, // A / Aa / Aaa
+                                style: TextStyle(
+                                  fontSize: 13 * s.$1,
+                                  fontWeight: FontWeight.bold,
+                                  color: isActive
+                                      ? Colors.white
+                                      : (isDark
+                                          ? const Color(0xFF7DC99A)
+                                          : AppColors.textSecondary),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                s.$2, // เล็ก / กลาง / ใหญ่
+                                style: GoogleFonts.notoSansThai(
+                                  fontSize: 9,
+                                  color: isActive
+                                      ? Colors.white70
+                                      : (isDark
+                                          ? const Color(0xFF5A7A65)
+                                          : AppColors.textSecondary),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Notification Toggle Row ───────────────────────────────────────────────────
+  Widget _buildNotificationToggleRow(bool isDark) {
+    final isOn = store?.notificationsEnabled ?? true;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+      child: Row(
+        children: [
+          _SettingIcon(
+            emoji: isOn ? '🔔' : '🔕',
+            bgColor: isDark ? const Color(0xFF2A3A28) : const Color(0xFFE8F5E9),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  lang == 'en' ? 'Notifications' : 'การแจ้งเตือน',
+                  style: _titleStyle(isDark),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isOn
+                      ? (lang == 'en' ? 'Enabled' : 'เปิดใช้งาน')
+                      : (lang == 'en' ? 'Disabled' : 'ปิดใช้งาน'),
+                  style: _subStyle(isDark),
+                ),
+              ],
+            ),
+          ),
+          Transform.scale(
+            scale: 0.85,
+            child: Switch.adaptive(
+              value: isOn,
+              onChanged: store == null
+                  ? null
+                  : (v) async {
+                      await store!.toggleNotifications();
+                      setState(() {});
+                    },
+              activeColor: Colors.white,
+              activeTrackColor: AppColors.primary,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor:
+                  isDark ? const Color(0xFF3A4A40) : const Color(0xFFE0E0E0),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── About Card ────────────────────────────────────────────────────────────────
+  Widget _buildAboutCard(bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E3028) : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A4035) : const Color(0xFFF0F0F0),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // App Icon placeholder
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Center(
+              child: Icon(Icons.eco_rounded, color: Colors.white, size: 28),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Plantify 🪴',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? const Color(0xFFD4E8DC)
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  lang == 'en'
+                      ? 'Version 1.0.0  •  Grow your sanctuary'
+                      : 'เวอร์ชัน 1.0.0  •  ปลูกต้นไม้ ดูแลง่าย',
+                  style: GoogleFonts.notoSansThai(
+                    fontSize: 12,
+                    color: isDark
+                        ? const Color(0xFF5A7A65)
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   TextStyle _titleStyle(bool isDark) => GoogleFonts.notoSansThai(
         fontSize: 14,
         fontWeight: FontWeight.w600,
@@ -945,6 +1135,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
         fontSize: 12,
         color: isDark ? const Color(0xFF5A7A65) : const Color(0xFF9E9E9E),
       );
+
+  // ── Sign-out confirmation ─────────────────────────────────────────────────────
+  void _confirmSignOut(BuildContext context, bool isDark) {
+    final name = widget.profileStore?.profile?.displayName ?? 'Plant Lover';
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: isDark ? const Color(0xFF1E3028) : Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.error.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Center(
+                  child: Text('👋', style: TextStyle(fontSize: 30)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                lang == 'en' ? 'Sign Out?' : 'ออกจากระบบ?',
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color:
+                      isDark ? const Color(0xFFD4E8DC) : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                lang == 'en'
+                    ? 'See you later, $name 🌿\nYour data will be saved.'
+                    : 'แล้วเจอกันนะ $name 🌿\nข้อมูลของคุณจะยังคงอยู่',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.notoSansThai(
+                  fontSize: 13,
+                  color: isDark
+                      ? const Color(0xFF5A7A65)
+                      : AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: BorderSide(
+                          color: isDark
+                              ? const Color(0xFF2A4035)
+                              : const Color(0xFFE0E0E0),
+                        ),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        lang == 'en' ? 'Cancel' : 'ยกเลิก',
+                        style: GoogleFonts.outfit(
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? const Color(0xFFD4E8DC)
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('offline_logged_in', false);
+                        if (context.mounted) {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                                builder: (_) => const LoginSignupScreen()),
+                            (_) => false,
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text(
+                        lang == 'en' ? 'Sign Out' : 'ออกเลย',
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class User {

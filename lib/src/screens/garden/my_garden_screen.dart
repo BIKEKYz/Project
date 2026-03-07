@@ -131,37 +131,20 @@ class MyGardenScreen extends StatelessWidget {
         slivers: [
           // ── App Bar ──────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 160,
+            expandedHeight: 100,
             pinned: true,
             backgroundColor:
                 isDark ? const Color(0xFF0D1A12) : const Color(0xFFF5F7F2),
             surfaceTintColor: Colors.transparent,
             elevation: 0,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 20, bottom: 16),
+              titlePadding: const EdgeInsets.only(left: 20, bottom: 14),
               title: Text(
                 s.myGardenTitle,
                 style: GoogleFonts.outfit(
                   color: isDark ? const Color(0xFF7DC99A) : AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? [
-                            const Color(0xFF0D1A12),
-                            const Color(0xFF162B1C),
-                          ]
-                        : [
-                            AppColors.secondary.withOpacity(0.06),
-                            const Color(0xFFF5F7F2),
-                          ],
-                  ),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
                 ),
               ),
             ),
@@ -360,30 +343,26 @@ class _StatsDashboard extends StatelessWidget {
     final needsWaterCount = myPlants.length - totalWatered;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1A2820) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.3 : 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: isDark ? const Color(0xFF1A2820) : AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A4035) : AppColors.divider,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isTh ? 'สถิติสวนของฉัน 📊' : 'My Garden Stats 📊',
+            isTh ? 'สถิติสวนของฉัน' : 'My Garden Stats',
             style: GoogleFonts.outfit(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFD4E8DC) : const Color(0xFF1A1A1A),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isDark ? const Color(0xFFD4E8DC) : AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -395,7 +374,7 @@ class _StatsDashboard extends StatelessWidget {
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: _StatItem(
                   emoji: '💧',
@@ -407,7 +386,7 @@ class _StatsDashboard extends StatelessWidget {
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: _StatItem(
                   emoji: '🔥',
@@ -417,7 +396,7 @@ class _StatsDashboard extends StatelessWidget {
                   isDark: isDark,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: _StatItem(
                   emoji: '🏆',
@@ -430,24 +409,24 @@ class _StatsDashboard extends StatelessWidget {
             ],
           ),
           if (myPlants.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            // Care completion bar
+            const SizedBox(height: 12),
             Text(
               isTh
                   ? 'การดูแลสัปดาห์นี้: $totalWatered / ${myPlants.length} ต้น'
                   : 'Care this week: $totalWatered / ${myPlants.length} plants',
               style: GoogleFonts.outfit(
-                fontSize: 12,
-                color: isDark ? const Color(0xFF5A7A65) : Colors.black45,
+                fontSize: 11,
+                color:
+                    isDark ? const Color(0xFF5A7A65) : AppColors.textSecondary,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 5),
             ClipRRect(
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: myPlants.isEmpty ? 0 : totalWatered / myPlants.length,
-                minHeight: 8,
-                backgroundColor: AppColors.primary.withOpacity(0.08),
+                minHeight: 5,
+                backgroundColor: AppColors.primary.withOpacity(0.06),
                 valueColor:
                     const AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
@@ -477,19 +456,19 @@ class _StatItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.12 : 0.06),
-        borderRadius: BorderRadius.circular(14),
+        color: color.withOpacity(isDark ? 0.10 : 0.05),
+        borderRadius: BorderRadius.circular(10),
       ),
       child: Column(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 22)),
-          const SizedBox(height: 4),
+          Text(emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 3),
           Text(
             value,
             style: GoogleFonts.outfit(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -497,8 +476,8 @@ class _StatItem extends StatelessWidget {
           Text(
             label,
             style: GoogleFonts.outfit(
-              fontSize: 11,
-              color: isDark ? const Color(0xFF5A7A65) : Colors.black45,
+              fontSize: 10,
+              color: isDark ? const Color(0xFF5A7A65) : AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -534,17 +513,12 @@ class _TodaysTasks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF2196F3).withOpacity(isDark ? 0.15 : 0.08),
-            const Color(0xFF0D47A1).withOpacity(isDark ? 0.08 : 0.03),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        color: isDark ? const Color(0xFF1A2820) : const Color(0xFFF0F7FF),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: const Color(0xFF2196F3).withOpacity(0.15),
+          color: const Color(0xFF2196F3).withOpacity(0.18),
         ),
       ),
       child: Column(
@@ -732,32 +706,20 @@ class _QuizBanner extends StatelessWidget {
         MaterialPageRoute(builder: (_) => PlantQuizScreen(lang: lang)),
       ),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: isDark
-                ? [
-                    AppColors.primary.withOpacity(0.25),
-                    AppColors.secondary.withOpacity(0.15),
-                  ]
-                : [
-                    AppColors.primary.withOpacity(0.9),
-                    AppColors.secondary,
-                  ],
+          color: isDark ? const Color(0xFF1A2820) : AppColors.cardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isDark
+                ? const Color(0xFF2A4035)
+                : AppColors.primary.withOpacity(0.15),
           ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Row(
           children: [
-            const Text('🧠', style: TextStyle(fontSize: 36)),
-            const SizedBox(width: 14),
+            const Text('🧠', style: TextStyle(fontSize: 32)),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -765,9 +727,10 @@ class _QuizBanner extends StatelessWidget {
                   Text(
                     isTh ? 'ทดสอบความรู้ต้นไม้' : 'Plant Knowledge Quiz',
                     style: GoogleFonts.outfit(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color:
+                          isDark ? const Color(0xFF7DC99A) : AppColors.primary,
                     ),
                   ),
                   Text(
@@ -776,22 +739,24 @@ class _QuizBanner extends StatelessWidget {
                         : '10 questions • Identify plants • Learn facts',
                     style: GoogleFonts.outfit(
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.85),
+                      color: isDark
+                          ? const Color(0xFF5A7A65)
+                          : AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                isTh ? 'เริ่ม →' : 'Start →',
+                isTh ? 'เริ่ม' : 'Start',
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
